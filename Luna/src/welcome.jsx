@@ -1,44 +1,20 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 
 function Welcome(){
-
-    const [started, setStarted] = useState(false);
-
-    const handleClick = () => {
-        setStarted(true);
-    };
-
+    const navigate = useNavigate();
     return(
-        <div className="container">
-            <h1 className="logo"> Luna</h1>
-            {!started ?(
-                <>
-                <h2> Your Local AI Desktop Assistant</h2>
-                <p>
-                    Fast. Private. Intelligent
-                </p>
-             
-            
-            <button onClick ={handleClick}>
-                Get Started
-            </button>
-               </>
-            ):(
-                <>
-                <h2> Hello Ashu!</h2>
+    <div className="container">
+     <h1 className="logo"> Luna</h1>   
+     <h2> Your Local AI Desktop Assistant</h2>
+          <p>Fast • Private • Intelligent</p>
+          
 
-                <p>
-                    Let's set up Luna
-                </p>
+    <button onClick={ ()=> navigate("/setup")}>Get Started</button>
+    </div>
+)
 
-            <button>
-                continue
-            </button>
-                </>
-            )}
-            
-             </div>
-    );
 }
+
 
 export default Welcome;

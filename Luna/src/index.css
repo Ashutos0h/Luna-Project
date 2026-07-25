@@ -11,15 +11,60 @@ body {
 }
 
 .container {
-  height: 100vh;
+    min-height: 100vh;
+    background: #10172d;
 
-  display: flex;
-  flex-direction: column;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
 
-  justify-content: center;
-  align-items: center;
+.setup-form {
+    display: flex;
+    flex-direction: column;
 
-  text-align: center;
+    gap: 18px;
+
+    width: 350px;
+    margin-top: 25px;
+}
+
+.setup-form input,
+.setup-form select {
+    padding: 12px 15px;
+
+    font-size: 15px;
+
+    border-radius: 8px;
+
+    border: none;
+
+    outline: none;
+}
+
+.setup-form button {
+    margin-top: 10px;
+
+    padding: 14px;
+
+    font-size: 15px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background: #4b8fe8;
+
+    color: white;
+
+    cursor: pointer;
+
+    transition: 0.3s;
+}
+
+.setup-form button:hover {
+    background: #2f6fd0;
 }
 
 .logo {

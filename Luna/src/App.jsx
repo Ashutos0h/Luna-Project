@@ -1,10 +1,16 @@
-import Welcome from "./Welcome";
+import Welcome from "./welcome";
+import {Routes, Route} from "react-router-dom";
+import Setup from "./Setup";
+
+
 
 function App() {
   return (
-    <div>
-      <Welcome />
-    </div>
+<Routes>
+  <Route path="/" element= {<Welcome />} />
+  <Route path="/setup" element= {<Setup />} />
+
+</Routes>
   );
 }
 
