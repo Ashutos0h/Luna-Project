@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function Setup(){
     const [userName, setUserName] = useState("");
@@ -7,7 +8,11 @@ function Setup(){
     const [profession, setProfession] = useState("");
     const [theme, setTheme]= useState("");
 
-    function handleSubmit() {
+    const navigate= useNavigate();
+
+    function handleSubmit(e) {
+    e.preventDefault();
+
         if (!userName.trim()){
             alert("Please enter your Name");
             return;
@@ -17,6 +22,21 @@ function Setup(){
             alert("Please enter assistant name");
             return;
         }
+
+        if(!language.trim()){
+            alert("Please select a langugae")
+            return;
+        }
+
+        if (!profession) {
+        alert("Please select a profession");
+        return;
+         }
+
+        if (!theme) {
+        alert("Please select a theme");
+        return;
+         }
     
     const setupData = {
         userName,
@@ -27,15 +47,14 @@ function Setup(){
     };
 
     localStorage.setItem("lunaSetup", JSON.stringify(setupData));
-
-    alert("Setup completed successfully!");
+     navigate("/dashboard");
     }
 
     return(
         <div className="container">
             <h1> Setup Luna</h1>
         
-        <form className="setup-form">
+        <form className="setup-form" onSubmit={handleSubmit}>
         
         <input
         type="text"
@@ -60,7 +79,7 @@ function Setup(){
             </select>
 
         <select
-        balue ={profession}
+        value ={profession}
         onChange={(e)=> setProfession(e.target.value)}
         >
             <option>Student</option>
@@ -76,10 +95,12 @@ function Setup(){
             <option>Dark</option>
         </select>
 
-
-        <button onClick={handleSubmit}>
+     
+          <button type="submit">
             Continue
         </button>
+        
+      
         </form>
         </div>
     );
