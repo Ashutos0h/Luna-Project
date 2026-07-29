@@ -71,3 +71,9 @@
     padding:12px 20px;
 
 }
+
+.typing-message {
+    color: gray;
+    font-style: italic;
+    margin-left: 10px;
+}
