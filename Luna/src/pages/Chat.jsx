@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import ChatBubble from "../components/ChatBubble";
 import MessageInput from "../components/MessageInput";
 import "../styles/Chat.css";
-import { sendMessage } from "../services/chatService";
+import { sendMessage } from "../services/aiService";
+
 
 function Chat() {
   // Initial assistant message
@@ -13,6 +14,7 @@ function Chat() {
   };
 
   // State
+  // const [input, setInput]= useState("");
   const [messages, setMessages] = useState([welcomeMessage]);
   const [loading, setLoading] = useState(false);
 
