@@ -1,24 +1,44 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+
 import "../styles/Sidebar.css";
 
-function Sidebar(){
+function Sidebar({
+
+    conversations,
+    activeChatId,
+    onSelectConversation,
+    onNewChat
+}){
     return(
-        <div className='sidebar'>
-            <h2> Luna</h2>
-            <NavLink to= "/dashboard/chat"> Chat</NavLink>
-            <NavLink to= "/dashboard/memory"> Memory</NavLink>
-            <NavLink to= "/dashboard/setting"> Setting</NavLink>
-            <NavLink to= "/dashboard/privacy"> Privacy</NavLink>
-        
-        <hr />
-        <h3>History</h3>
-        <p>Todays's chat</p>
-        <p>Project Ideas</p>
-        <p>History</p>
+<div className ="sidebar">
 
+    <h2> Luna</h2>
 
+    <button className="new-chat-btn"
+    onClick={onNewChat}>
+        New Chat
+    </button>
+
+    <h3> History</h3>
+
+    {conversations.map((chat)=>(
+        <div
+        key = {chat.id}
+
+            className = {
+                activeChatId===chat.id
+                ? "chat-item active"
+                : "chat-item"
+            }
+
+            onClick = {()=> 
+            onSelectConversation(chat)
+            }
+        >
+            {chat.title}
         </div>
+    ))}
+</div>
+
     );
 }
 

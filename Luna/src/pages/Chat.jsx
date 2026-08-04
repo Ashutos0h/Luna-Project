@@ -2,53 +2,105 @@ import { useState, useEffect, useRef } from "react";
 import ChatBubble from "../components/ChatBubble";
 import MessageInput from "../components/MessageInput";
 import "../styles/Chat.css";
-import { sendMessage } from "../services/aiService";
 
+import { sendMessage } from "../services/chatService";
+
+import {
+  loadConversations,
+  saveConversations,
+} from "../services/chatStorage";
 
 function Chat() {
-  // Initial assistant message
+  // Initial welcome message
   const welcomeMessage = {
     id: 1,
     sender: "assistant",
     text: "Hello! I'm Luna. How can I help you today?",
   };
 
-  // State
-  // const [input, setInput]= useState("");
+  // Current chat messages
   const [messages, setMessages] = useState([welcomeMessage]);
+
+  // All conversations
+  const [conversations, setConversations] = useState([]);
+
+  // Active conversation
+  const [activeChatId, setActiveChatId] = useState(null);
+
+  // Loading state
   const [loading, setLoading] = useState(false);
 
-  // Reference for auto-scrolling
+  // Auto scroll
   const bottomRef = useRef(null);
 
-  // Scroll to the latest message whenever messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
       behavior: "smooth",
     });
   }, [messages]);
 
-  // Handle sending a message
+  // Load conversations when app starts
+  useEffect(() => {
+    const savedChats = loadConversations();
+
+    if (savedChats.length > 0) {
+      setConversations(savedChats);
+
+      setActiveChatId(savedChats[0].id);
+
+      setMessages(savedChats[0].messages);
+    } else {
+      const firstConversation = {
+        id: Date.now(),
+        title: "New Chat",
+        messages: [welcomeMessage],
+      };
+
+      setConversations([firstConversation]);
+      setActiveChatId(firstConversation.id);
+
+      saveConversations([firstConversation]);
+    }
+  }, []);
+
+  // Save whenever messages change
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    const updatedChats = conversations.map((chat) =>
+      chat.id === activeChatId
+        ? {
+            ...chat,
+            messages,
+          }
+        : chat
+    );
+
+    setConversations(updatedChats);
+
+    saveConversations(updatedChats);
+
+  }, [messages]);
+
+  // Send message
   async function handleSend(message) {
     if (!message.trim()) return;
 
-    // User message
     const userMessage = {
       id: Date.now(),
       sender: "user",
       text: message,
     };
 
-    // Display user message immediately
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+
+    setMessages(updatedMessages);
 
     setLoading(true);
 
     try {
-      // Send message to Electron
       const reply = await sendMessage(message);
 
-      // Display assistant response
       const assistantMessage = {
         id: Date.now() + 1,
         sender: "assistant",
@@ -56,32 +108,69 @@ function Chat() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error("Error:", error);
 
-      // Display error message
+      // Generate title using first user message
+      if (
+        messages.length === 1 &&
+        activeChatId
+      ) {
+        const updatedChats = conversations.map((chat) =>
+          chat.id === activeChatId
+            ? {
+                ...chat,
+                title:
+                  message.length > 30
+                    ? message.substring(0, 30) + "..."
+                    : message,
+              }
+            : chat
+        );
+
+        setConversations(updatedChats);
+
+        saveConversations(updatedChats);
+      }
+    } catch (error) {
+      console.error(error);
+
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now() + 1,
+          id: Date.now() + 2,
           sender: "assistant",
-          text: "Something went wrong while generating the response.",
+          text: "Something went wrong.",
         },
       ]);
     } finally {
-      // Always stop loading
       setLoading(false);
     }
   }
 
-  // Start a new chat
+  // New chat
   function handleNewChat() {
-    setMessages([welcomeMessage]);
+    const newConversation = {
+      id: Date.now(),
+      title: "New Chat",
+      messages: [welcomeMessage],
+    };
+
+    const updatedChats = [
+      ...conversations,
+      newConversation,
+    ];
+
+    setConversations(updatedChats);
+
+    saveConversations(updatedChats);
+
+    setActiveChatId(newConversation.id);
+
+    setMessages(newConversation.messages);
   }
 
   return (
     <div className="chat-container">
-      {/* Header */}
+
       <div className="chat-header">
         <h2>Luna Chat</h2>
 
@@ -90,8 +179,8 @@ function Chat() {
         </button>
       </div>
 
-      {/* Messages */}
       <div className="chat-messages">
+
         {messages.map((message) => (
           <ChatBubble
             key={message.id}
@@ -100,24 +189,25 @@ function Chat() {
           />
         ))}
 
-        {/* Typing Indicator */}
         {loading && (
           <div className="typing-message">
             Luna is typing...
           </div>
         )}
 
-        {/* Auto-scroll target */}
         <div ref={bottomRef}></div>
+
       </div>
 
-      {/* Input */}
       <MessageInput
         onSend={handleSend}
         disabled={loading}
       />
+
     </div>
   );
 }
+
+
 
 export default Chat;

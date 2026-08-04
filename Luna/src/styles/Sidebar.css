@@ -26,3 +26,39 @@
 .sidebar a.active {
     background: #10a37f;
 }
+
+.new-chat-btn{
+
+    width:100%;
+
+    padding:12px;
+
+    margin-bottom:20px;
+
+}
+
+.chat-item{
+
+    padding:12px;
+
+    cursor:pointer;
+
+    border-radius:8px;
+
+    margin-bottom:8px;
+
+}
+
+.chat-item:hover{
+
+    background:#2f3b4a;
+
+}
+
+.chat-item.active{
+
+    background:#4f46e5;
+
+    color:white;
+
+}

@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Welcome from "./welcome";
 import Setup from "./Setup";
@@ -12,7 +12,6 @@ import Privacy from "./pages/Privacy";
 function App() {
   return (
     <Routes>
-
       {/* Welcome Page */}
       <Route path="/" element={<Welcome />} />
 
@@ -30,9 +29,7 @@ function App() {
         <Route path="memory" element={<Memory />} />
         <Route path="setting" element={<Setting />} />
         <Route path="privacy" element={<Privacy />} />
-
       </Route>
-
     </Routes>
   );
 }
