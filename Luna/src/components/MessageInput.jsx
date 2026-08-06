@@ -1,41 +1,66 @@
 import { useState } from "react";
+import "../styles/MessageInput.css";
 
 function MessageInput({ onSend, disabled }) {
-  const [message, setMessage] = useState("");
 
-  function handleSend() {
-    if (!message.trim()) return;
+    const [message, setMessage] = useState("");
 
-    onSend(message);
+    function handleSend() {
 
-    setMessage("");
-  }
+        if (!message.trim()) return;
 
-  function handleKeyDown(e) {
-    if (e.key === "Enter") {
-      handleSend();
+        onSend(message);
+
+        setMessage("");
+
     }
-  }
 
-  return (
-    <div className="message-input">
-      <input
-        type="text"
-        placeholder="Type your message..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-      />
+    function handleKeyDown(e) {
 
-      <button
-        onClick={handleSend}
-        disabled={disabled}
-      >
-        Send
-      </button>
-    </div>
-  );
+        if (e.key === "Enter") {
+
+            handleSend();
+
+        }
+
+    }
+
+    return (
+
+        <div className="message-input">
+
+            <input
+
+                type="text"
+
+                placeholder="Type your message..."
+
+                value={message}
+
+                disabled={disabled}
+
+                onChange={(e) => setMessage(e.target.value)}
+
+                onKeyDown={handleKeyDown}
+
+            />
+
+            <button
+
+                onClick={handleSend}
+
+                disabled={disabled}
+
+            >
+
+                Send
+
+            </button>
+
+        </div>
+
+    );
+
 }
 
 export default MessageInput;

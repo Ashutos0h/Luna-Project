@@ -1,105 +1,62 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: Arial, Helvetica, sans-serif;
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: #0f172a;
-  color: white;
+html,
+body,
+#root{
+    width:100%;
+    height:100%;
 }
 
-.container {
-    min-height: 100vh;
-    background: #10172d;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
+body{
+    margin:0;
 }
 
-.setup-form {
-    display: flex;
-    flex-direction: column;
+.container{
+    width:100%;
+    height:100vh;
 
-    gap: 18px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
 
-    width: 350px;
-    margin-top: 25px;
+    background:#0f172a;
+    color:white;
+    text-align:center;
 }
 
-.setup-form input,
-.setup-form select {
-    padding: 12px 15px;
-
-    font-size: 15px;
-
-    border-radius: 8px;
-
-    border: none;
-
-    outline: none;
+.logo{
+    font-size:64px;
+    font-weight:bold;
+    margin-bottom:20px;
 }
 
-.setup-form button {
-    margin-top: 10px;
-
-    padding: 14px;
-
-    font-size: 15px;
-
-    border: none;
-
-    border-radius: 10px;
-
-    background: #4b8fe8;
-
-    color: white;
-
-    cursor: pointer;
-
-    transition: 0.3s;
+.container h2{
+    font-size:48px;
+    margin-bottom:20px;
 }
 
-.setup-form button:hover {
-    background: #2f6fd0;
+.container p{
+    font-size:22px;
+    color:#cbd5e1;
+    margin-bottom:40px;
 }
 
-.logo {
-  font-size: 60px;
-  margin-bottom: 20px;
+.container button{
+    padding:15px 35px;
+    border:none;
+    border-radius:12px;
+    background:#4f46e5;
+    color:white;
+    font-size:18px;
+    cursor:pointer;
 }
 
-h2 {
-  margin-bottom: 15px;
-  font-size: 32px;
-}
-
-p {
-  color: #cbd5e1;
-  margin-bottom: 30px;
-  font-size: 18px;
-}
-
-button {
-  background: #3394de;
-  color: white;
-
-  border: none;
-
-  padding: 14px 28px;
-
-  border-radius: 8px;
-
-  font-size: 20px;
-
-  cursor: pointer;
-
-  transition: 0.3s;
-}
-
-button:hover {
-  background: #2563eb;
+.container button:hover{
+    background:#4338ca;
 }
