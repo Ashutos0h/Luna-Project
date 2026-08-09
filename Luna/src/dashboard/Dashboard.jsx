@@ -18,17 +18,29 @@ import {
 function Dashboard() {
 
   // Welcome message
-  const welcomeMessage = {
-    id: 1,
+const [settings, setSettings] = useState(loadSettings());
+
+function createWelcomeMessage() {
+  return {
+    id: Date.now(),
     sender: "assistant",
-    text: "Hello! I'm Luna. How can I help you today?",
+    text: `Hello! I'm ${
+      settings.assistantName || "Luna"
+    }. How can I help you today?`,
   };
+}
 
   // Sidebar Pages
   const [currentPage, setCurrentPage] = useState("chat");
 
-  // Setting 
-  const [settings, setSettings] = useState(loadSettings());
+ 
+
+  useEffect(() => {
+  document.body.setAttribute(
+    "data-theme",
+    settings.theme
+  );
+}, [settings]);
 
   // Conversations
   const [conversations, setConversations] = useState([]);
@@ -61,7 +73,7 @@ document.body.setAttribute(
       const firstChat = {
         id: Date.now(),
         title: "New Chat",
-        messages: [welcomeMessage],
+        messages: [createWelcomeMessage()],
       };
 
       setConversations([firstChat]);
@@ -83,7 +95,7 @@ document.body.setAttribute(
 
       title: "New Chat",
 
-      messages: [welcomeMessage],
+      messages: [createWelcomeMessage()],
 
     };
 
@@ -176,7 +188,7 @@ document.body.setAttribute(
 
         title: "New Chat",
 
-        messages: [welcomeMessage],
+        messages: [createWelcomeMessage()],
 
       };
 
@@ -197,6 +209,30 @@ document.body.setAttribute(
     saveConversations(updatedChats);
 
   }
+
+  // Clear All Chats By One Click
+  function clearAllChats() {
+ console.log("Dashboard function called");
+  const firstChat = { 
+  
+
+    id: Date.now(),
+
+    title: "New Chat",
+
+    messages: [createWelcomeMessage()],
+
+  };
+
+  setConversations([firstChat]);
+
+  setActiveChatId(firstChat.id);
+
+  setCurrentPage("chat");
+
+  saveConversations([firstChat]);
+
+}
 
   // Active Conversation
   const activeConversation = conversations.find(
@@ -222,15 +258,15 @@ document.body.setAttribute(
 
       <div className="content">
 
-        {currentPage === "chat" && activeConversation && (
+{currentPage === "chat" && activeConversation && (
 
-<Chat
-    conversation={activeConversation}
-    updateMessages={updateMessages}
-    settings={settings}
-/>
+    <Chat
+        conversation={activeConversation}
+        updateMessages={updateMessages}
+        settings={settings}
+    />
 
-        )}
+)}
 
         {currentPage === "memory" && (
 
@@ -259,7 +295,7 @@ document.body.setAttribute(
 
         {currentPage === "privacy" && (
 
-          <Privacy />
+          <Privacy onClearChats={clearAllChats} />
 
         )}
 

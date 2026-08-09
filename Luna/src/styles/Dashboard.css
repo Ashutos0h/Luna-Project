@@ -11,4 +11,12 @@
     flex-direction:column;
     min-width:0;
     overflow:hidden;
+        overflow-y:auto;
+    overflow-x:hidden;
+    background:var(--background);
+}
+
+.sidebar{
+    height:100vh;
+    flex-shrink:0;
 }

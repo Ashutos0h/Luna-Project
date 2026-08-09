@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import "../styles/Setting.css"
+import "../styles/Setting.css";
+
 import {
   loadSettings,
   saveSettings,
@@ -8,57 +9,72 @@ import {
 } from "../services/settingsStorage";
 
 function Setting({ onSettingsSaved }) {
+
   const [settings, setSettings] = useState(getDefaultSettings());
 
   useEffect(() => {
-    const saved = loadSettings();
-    setSettings(saved);
+
+    const savedSettings = loadSettings();
+
+    setSettings(savedSettings);
+
   }, []);
 
   function handleChange(e) {
+
     const { name, value } = e.target;
 
     setSettings((prev) => ({
       ...prev,
       [name]: value,
     }));
+
   }
 
   function handleSave() {
-saveSettings(settings);
 
-if (onSettingsSaved) {
+    saveSettings(settings);
 
-    onSettingsSaved(settings);
+    if (onSettingsSaved) {
 
-}
+      onSettingsSaved(settings);
 
-alert("Settings saved successfully!");
+    }
+
+    alert("✅ Settings saved successfully!");
+
   }
 
   function handleReset() {
-    resetSettings();
 
     const defaults = getDefaultSettings();
 
-saveSettings(defaults);
+    resetSettings();
 
+    saveSettings(defaults);
 
-if (onSettingsSaved) {
+    setSettings(defaults);
 
-    onSettingsSaved(defaults);
+    if (onSettingsSaved) {
 
-}
+      onSettingsSaved(defaults);
 
-alert("Settings reset successfully!");
+    }
+
+    alert("✅ Settings reset successfully!");
+
   }
+
   return (
+
     <div className="settings-container">
 
-      <h1>Settings</h1>
+      <h1>⚙️ Settings</h1>
 
       {/* User Name */}
+
       <div className="setting-group">
+
         <label>User Name</label>
 
         <input
@@ -67,10 +83,13 @@ alert("Settings reset successfully!");
           value={settings.userName}
           onChange={handleChange}
         />
+
       </div>
 
       {/* Assistant Name */}
+
       <div className="setting-group">
+
         <label>Assistant Name</label>
 
         <input
@@ -79,10 +98,13 @@ alert("Settings reset successfully!");
           value={settings.assistantName}
           onChange={handleChange}
         />
+
       </div>
 
       {/* Language */}
+
       <div className="setting-group">
+
         <label>Language</label>
 
         <select
@@ -90,13 +112,38 @@ alert("Settings reset successfully!");
           value={settings.language}
           onChange={handleChange}
         >
+
           <option value="English">English</option>
           <option value="Hindi">Hindi</option>
+
         </select>
+
+      </div>
+
+      {/* Profession */}
+
+      <div className="setting-group">
+
+        <label>Profession</label>
+
+        <select
+          name="profession"
+          value={settings.profession}
+          onChange={handleChange}
+        >
+
+          <option value="Student">Student</option>
+          <option value="Employee">Employee</option>
+          <option value="Founder">Founder</option>
+
+        </select>
+
       </div>
 
       {/* Theme */}
+
       <div className="setting-group">
+
         <label>Theme</label>
 
         <select
@@ -104,13 +151,18 @@ alert("Settings reset successfully!");
           value={settings.theme}
           onChange={handleChange}
         >
+
           <option value="dark">Dark</option>
           <option value="light">Light</option>
+
         </select>
+
       </div>
 
       {/* AI Model */}
+
       <div className="setting-group">
+
         <label>AI Model</label>
 
         <select
@@ -118,11 +170,25 @@ alert("Settings reset successfully!");
           value={settings.aiModel}
           onChange={handleChange}
         >
-          <option value="qwen2.5:3b">Qwen 2.5 3B</option>
-          <option value="llama3">Llama 3</option>
-          <option value="mistral">Mistral</option>
-          <option value="deepseek-r1:7b">DeepSeek R1 7B</option>
+
+          <option value="qwen2.5:3b">
+            Qwen 2.5 3B
+          </option>
+
+          <option value="llama3">
+            Llama 3
+          </option>
+
+          <option value="mistral">
+            Mistral
+          </option>
+
+          <option value="deepseek-r1:7b">
+            DeepSeek R1 7B
+          </option>
+
         </select>
+
       </div>
 
       <div className="button-group">
@@ -144,7 +210,9 @@ alert("Settings reset successfully!");
       </div>
 
     </div>
+
   );
+
 }
 
 export default Setting;

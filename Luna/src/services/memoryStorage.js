@@ -1,9 +1,9 @@
-const STORAGE_KEY ="luna_memories";
+const MEMORY_KEY ="luna_memories";
 
 //load all memories
 
 export function loadMemories(){
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(MEMORY_KEY);
 
     if(!data){
         return [];
@@ -16,7 +16,7 @@ export function loadMemories(){
 
 export function saveMemories(memories) {
   localStorage.setItem(
-    STORAGE_KEY,
+  MEMORY_KEY,
     JSON.stringify(memories)
   );
 }
@@ -49,4 +49,10 @@ export function updateMemory(updatedMemory) {
   );
 
   saveMemories(memories);
+}
+
+//Clear Memory
+
+export function clearMemory(){
+  localStorage.removeItem(MEMORY_KEY);
 }

@@ -1,6 +1,6 @@
 .setup-container{
     min-height:100vh;
-    background:#0f172a;
+    background:var(--bg);
 
     display:flex;
     justify-content:center;
@@ -11,7 +11,7 @@
 
     width:430px;
 
-    background:#1e293b;
+    background:var(--sidebar);
 
     border-radius:20px;
 
@@ -23,7 +23,7 @@
 
 .setup-card h1{
 
-    color:white;
+    color:var(--text);
 
     text-align:center;
 
@@ -35,7 +35,7 @@
 
 .setup-subtitle{
 
-    color:#94a3b8;
+    color:var(--secondary);
 
     text-align:center;
 
@@ -68,7 +68,7 @@
 
     background:#334155;
 
-    color:white;
+    color:var(--text);
 
     font-size:16px;
 
@@ -76,7 +76,7 @@
 
 .setup-form input::placeholder{
 
-    color:#94a3b8;
+    color:var(--secondary);
 
 }
 
@@ -92,7 +92,7 @@
 
     background:#4f46e5;
 
-    color:white;
+    color:var(--text);
 
     font-size:18px;
 

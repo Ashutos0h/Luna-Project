@@ -7,7 +7,7 @@ import "../styles/Chat.css";
 
 import { sendMessage } from "../services/chatService";
 
-function Chat({ conversation, updateMessages }) {
+function Chat({ conversation, updateMessages, settings }) {
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,20 +18,16 @@ function Chat({ conversation, updateMessages }) {
   useEffect(() => {
 
     if (conversation) {
-
       setMessages(conversation.messages);
-
     }
 
   }, [conversation]);
 
-  // Auto scroll
+  // Auto Scroll
   useEffect(() => {
 
     bottomRef.current?.scrollIntoView({
-
       behavior: "smooth",
-
     });
 
   }, [messages]);
@@ -41,25 +37,17 @@ function Chat({ conversation, updateMessages }) {
     if (!text.trim()) return;
 
     const userMessage = {
-
       id: Date.now(),
-
       sender: "user",
-
       text,
-
     };
 
     const updatedMessages = [
-
       ...messages,
-
       userMessage,
-
     ];
 
     setMessages(updatedMessages);
-
     updateMessages(updatedMessages);
 
     setLoading(true);
@@ -69,75 +57,50 @@ function Chat({ conversation, updateMessages }) {
       const reply = await sendMessage(text);
 
       const assistantMessage = {
-
         id: Date.now() + 1,
-
         sender: "assistant",
-
         text: reply,
-
       };
 
       const finalMessages = [
-
         ...updatedMessages,
-
         assistantMessage,
-
       ];
 
       setMessages(finalMessages);
-
       updateMessages(finalMessages);
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
       console.error(error);
 
       const errorMessage = {
-
         id: Date.now() + 2,
-
         sender: "assistant",
-
         text: "Something went wrong.",
-
       };
 
       const finalMessages = [
-
         ...updatedMessages,
-
         errorMessage,
-
       ];
 
       setMessages(finalMessages);
-
       updateMessages(finalMessages);
 
-    }
-
-    finally {
+    } finally {
 
       setLoading(false);
 
     }
-
   }
 
   if (!conversation) {
 
     return (
-
       <div className="chat-container">
-
         <h2>No conversation selected</h2>
-
       </div>
-
     );
 
   }
@@ -147,9 +110,7 @@ function Chat({ conversation, updateMessages }) {
     <div className="chat-container">
 
       <div className="chat-header">
-
         <h2>{conversation.title}</h2>
-
       </div>
 
       <div className="chat-messages">
@@ -157,13 +118,9 @@ function Chat({ conversation, updateMessages }) {
         {messages.map((message) => (
 
           <ChatBubble
-
             key={message.id}
-
             sender={message.sender}
-
             text={message.text}
-
           />
 
         ))}
@@ -172,7 +129,7 @@ function Chat({ conversation, updateMessages }) {
 
           <div className="typing-message">
 
-            Luna is typing...
+            {settings?.assistantName || "Luna"} is typing...
 
           </div>
 
@@ -182,14 +139,10 @@ function Chat({ conversation, updateMessages }) {
 
       </div>
 
-<div className="chat-footer">
-
-    <MessageInput
+      <MessageInput
         onSend={handleSend}
         disabled={loading}
-    />
-
-</div>
+      />
 
     </div>
 

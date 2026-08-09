@@ -2,121 +2,170 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/Setup.css";
 
-function Setup(){
-    const [userName, setUserName] = useState("");
-    const [assistantName, setAssistantName] = useState("");
-    const [language, setLanguage] = useState("");
-    const [profession, setProfession] = useState("");
-    const [theme, setTheme]= useState("");
+import { saveSettings } from "../services/settingsStorage";
 
-    const navigate= useNavigate();
+function Setup() {
 
-    function handleSubmit(e) {
+  const [userName, setUserName] = useState("");
+  const [assistantName, setAssistantName] = useState("");
+  const [language, setLanguage] = useState("");
+  const [profession, setProfession] = useState("");
+  const [theme, setTheme] = useState("");
+
+  const navigate = useNavigate();
+
+  function handleSubmit(e) {
+
     e.preventDefault();
 
-        if (!userName.trim()){
-            alert("Please enter your Name");
-            return;
-        }
-
-        if(!assistantName.trim()){
-            alert("Please enter assistant name");
-            return;
-        }
-
-        if(!language.trim()){
-            alert("Please select a langugae")
-            return;
-        }
-
-        if (!profession) {
-        alert("Please select a profession");
-        return;
-         }
-
-        if (!theme) {
-        alert("Please select a theme");
-        return;
-         }
-    
-    const setupData = {
-        userName,
-        assistantName,
-        language,
-        profession,
-        theme,
-    };
-
-    localStorage.setItem("lunaSetup", JSON.stringify(setupData));
-     navigate("/dashboard");
+    if (!userName.trim()) {
+      alert("Please enter your name.");
+      return;
     }
 
-return (
-<div className="setup-container">
+    if (!assistantName.trim()) {
+      alert("Please enter assistant name.");
+      return;
+    }
 
-    <div className="setup-card">
+    if (!language) {
+      alert("Please select a language.");
+      return;
+    }
 
-      <h1>🌙 Setup Luna</h1>
+    if (!profession) {
+      alert("Please select a profession.");
+      return;
+    }
 
-      <p className="setup-subtitle">
-        Let's personalize your assistant
-      </p>
+    if (!theme) {
+      alert("Please select a theme.");
+      return;
+    }
 
-      <form className="setup-form" onSubmit={handleSubmit}>
+    saveSettings({
+      userName,
+      assistantName,
+      language,
+      profession,
+      theme: theme.toLowerCase(),
+      aiModel: "qwen2.5:3b",
+    });
 
-        <input
-          type="text"
-          placeholder="Your Name"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-        />
+    navigate("/dashboard");
+  }
 
-        <input
-          type="text"
-          placeholder="Assistant Name"
-          value={assistantName}
-          onChange={(e) => setAssistantName(e.target.value)}
-        />
+  return (
 
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
+    <div className="setup-container">
+
+      <div className="setup-card">
+
+        <h1>🌙 Setup Luna</h1>
+
+        <p className="setup-subtitle">
+          Let's personalize your assistant.
+        </p>
+
+        <form
+          className="setup-form"
+          onSubmit={handleSubmit}
         >
-          <option value="">Select Language</option>
-          <option value="English">English</option>
-          <option value="Hindi">Hindi</option>
-        </select>
 
-        <select
-          value={profession}
-          onChange={(e) => setProfession(e.target.value)}
-        >
-          <option value="">Select Profession</option>
-          <option value="Student">Student</option>
-          <option value="Employee">Employee</option>
-          <option value="Founder">Founder</option>
-        </select>
+          <input
+            type="text"
+            placeholder="Your Name"
+            value={userName}
+            onChange={(e) =>
+              setUserName(e.target.value)
+            }
+          />
 
-        <select
-          value={theme}
-          onChange={(e) => setTheme(e.target.value)}
-        >
-          <option value="">Select Theme</option>
-          <option value="Dark">Dark</option>
-          <option value="Light">Light</option>
-        </select>
+          <input
+            type="text"
+            placeholder="Assistant Name"
+            value={assistantName}
+            onChange={(e) =>
+              setAssistantName(e.target.value)
+            }
+          />
 
-        <button type="submit">
-          Continue →
-        </button>
+          <select
+            value={language}
+            onChange={(e) =>
+              setLanguage(e.target.value)
+            }
+          >
+            <option value="">
+              Select Language
+            </option>
 
-      </form>
+            <option value="English">
+              English
+            </option>
+
+            <option value="Hindi">
+              Hindi
+            </option>
+
+          </select>
+
+          <select
+            value={profession}
+            onChange={(e) =>
+              setProfession(e.target.value)
+            }
+          >
+            <option value="">
+              Select Profession
+            </option>
+
+            <option value="Student">
+              Student
+            </option>
+
+            <option value="Employee">
+              Employee
+            </option>
+
+            <option value="Founder">
+              Founder
+            </option>
+
+          </select>
+
+          <select
+            value={theme}
+            onChange={(e) =>
+              setTheme(e.target.value)
+            }
+          >
+            <option value="">
+              Select Theme
+            </option>
+
+            <option value="Dark">
+              Dark
+            </option>
+
+            <option value="Light">
+              Light
+            </option>
+
+          </select>
+
+          <button type="submit">
+            Continue →
+          </button>
+
+        </form>
+
+      </div>
 
     </div>
 
-  </div>
-);
-    
-    
+  );
+
 }
+
 export default Setup;

@@ -12,51 +12,58 @@ body,
     height:100%;
 }
 
+/* ==========================
+   LIGHT THEME
+========================== */
+
+body[data-theme="light"]{
+
+    --background:#f4f6fb;
+    --sidebar:#ffffff;
+    --card:#ffffff;
+
+    --primary:#4f46e5;
+
+    --text:#111827;
+    --secondary-text:#6b7280;
+
+    --border:#d1d5db;
+
+    --hover:#eef2ff;
+
+}
+
+/* ==========================
+   DARK THEME
+========================== */
+
+body[data-theme="dark"]{
+
+    --background:#0f172a;
+    --sidebar:#1e293b;
+    --card:#273449;
+
+    --primary:#4f46e5;
+
+    --secondary-text:#94a3b8;
+
+        --text:white;
+
+    --border:#444;
+
+
+    --hover:#334155;
+
+}
+
 body{
+
     margin:0;
-}
 
-.container{
-    width:100%;
-    height:100vh;
+    background:var(--background);
 
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
+    color:var(--text);
 
-    background:#0f172a;
-    color:white;
-    text-align:center;
-}
+    transition:.3s;
 
-.logo{
-    font-size:64px;
-    font-weight:bold;
-    margin-bottom:20px;
-}
-
-.container h2{
-    font-size:48px;
-    margin-bottom:20px;
-}
-
-.container p{
-    font-size:22px;
-    color:#cbd5e1;
-    margin-bottom:40px;
-}
-
-.container button{
-    padding:15px 35px;
-    border:none;
-    border-radius:12px;
-    background:#4f46e5;
-    color:white;
-    font-size:18px;
-    cursor:pointer;
-}
-
-.container button:hover{
-    background:#4338ca;
 }

@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Welcome from "./Welcome";
+import Welcome from "./pages/Welcome";
 import Setup from "./pages/Setup";
-
+      
 import Dashboard from "./Dashboard/Dashboard";
 
 function App() {

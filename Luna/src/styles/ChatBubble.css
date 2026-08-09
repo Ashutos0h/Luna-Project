@@ -14,7 +14,7 @@
 
     align-self:flex-end;
 
-    background:#4f46e5;
+    background:var(--primary);
 
     color:white;
 
@@ -24,8 +24,10 @@
 
     align-self:flex-start;
 
-    background:white;
+    background:var(--card);
 
-    border:1px solid #ddd;
+    color:var(--text);
+
+    border:1px solid var(--border);
 
 }

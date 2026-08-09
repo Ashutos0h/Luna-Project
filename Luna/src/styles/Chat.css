@@ -1,16 +1,18 @@
 .chat-container{
-
     flex:1;
-
     display:flex;
-
     flex-direction:column;
-
     width:100%;
-
     min-width:0;
 
-    background:#f7f7f8;
+
+    background:var(--background);
+    color:var(--text);
+
+    /* Providing Scrollability */
+    overflow-x: hidden;
+    overflow-y: scroll;
+
 
 }
 
@@ -28,8 +30,7 @@
 
     border-bottom:1px solid #ddd;
 
-    background:white;
-
+background: var(--background);
 }
 
 .chat-messages{
@@ -54,6 +55,5 @@
 
     border-top:1px solid #ddd;
 
-    background:white;
-
+background: var(--background);
 }

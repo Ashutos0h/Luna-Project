@@ -27,19 +27,21 @@ ipcMain.handle("chat-message", async (event, message) => {
   try {
     console.log("Calling Ollama...");
 
-    const response = await axios.post(
-      "http://localhost:11434/api/chat",
+const response = await axios.post(
+  "http://localhost:11434/api/chat",
+  {
+    model: message.model,
+
+    messages: [
       {
-        model: "qwen2.5:3b",
-        messages: [
-          {
-            role: "user",
-            content: message,
-          },
-        ],
-        stream: false,
-      }
-    );
+        role: "user",
+        content: message.prompt,
+      },
+    ],
+
+    stream: false,
+  }
+);
 
     console.log("Ollama Response:", response.data);
 
