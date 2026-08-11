@@ -3,6 +3,7 @@ import { clearMemory } from "../services/memoryStorage";
 import { resetSettings } from "../services/settingsStorage";
 import { clearConversations } from "../services/chatStorage";
 import { exportConversations } from "../services/chatStorage";
+import { importConversations } from "../services/chatStorage";
 
 import {useNavigate} from "react-router-dom";
 
@@ -56,6 +57,28 @@ function handleExportChats(){
   exportConversations();
 }
 
+// Handle Import Converstaions
+
+async function handleImportChats(event){
+    const file = event.target.files[0];
+
+    // if user chooses nothing file and cancel or if file is invalid or null
+    if(!file){
+        return;
+    }
+
+    // for safety purpose
+    try{
+        await importConversations(file);
+        alert("Conversations imported successfully.");
+        window.location.reload();
+    }
+
+    catch{
+        alert("Invalid JSON file.");
+    }
+}
+
 
   return (
 
@@ -75,7 +98,6 @@ function handleExportChats(){
         <ul>
 
           <li>💬 Conversations</li>
-
           
           <li>🧠 Memories</li>
  
@@ -188,23 +210,35 @@ function handleExportChats(){
 
     <h2>📤 Export Conversations</h2>
 
-    <p>
-
-        Download all conversations
-        as a JSON backup.
-
-    </p>
+    <p>Download all conversations as a JSON backup. </p>
 
     <button
         className="primary-btn"
-        onClick={handleExportChats}
-    >
-
+        onClick={handleExportChats} >
         📤 Export
-
     </button>
 
 </div>
+
+{/* Input Option */}
+
+<div className="privacy-card">
+
+    <h2>📥 Import Conversations</h2>
+
+    <p>Restore conversations from a backup.</p>
+
+    <input
+        type="file"
+
+        accept=".json"
+
+        onChange={handleImportChats}
+    />
+
+</div>
+
+
 
 
 

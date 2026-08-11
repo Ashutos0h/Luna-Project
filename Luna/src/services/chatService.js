@@ -1,46 +1,29 @@
 import { loadMemories } from "./memoryStorage";
 import { loadSettings } from "./settingsStorage";
 
-export async function sendMessage(message) {
+export async function sendMessage(message, documentContext = "") {
 
-    const memories = loadMemories();
+    try {
 
-    const settings = loadSettings();
+        const response = await window.electronAPI.sendMessage({
 
-    let memoryContext = "";
+            message: message,
 
-    if(memories.length>0){
+            documentContext: documentContext,
 
-        memoryContext = memories
-            .map(memory=>`${memory.title}: ${memory.value}`)
-            .join("\n");
+        });
+
+        return response;
+
+    } catch (error) {
+
+        console.error(
+            "Chat service error:",
+            error
+        );
+
+        throw error;
 
     }
-
-    const prompt = `
-
-Assistant Name:
-${settings.assistantName}
-
-Language:
-${settings.language}
-
-User Memories:
-
-${memoryContext}
-
-User Question:
-
-${message}
-
-`;
-
-    return await window.electronAPI.sendMessage({
-
-        model:settings.aiModel,
-
-        prompt,
-
-    });
 
 }

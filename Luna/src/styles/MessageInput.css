@@ -41,32 +41,113 @@ border:1px solid var(--border);
 }
 
 
-.message-input button{
+.hidden-file-input{
+    display:none;
+}
 
-    width:120px;
+.file-button{
 
+    width:55px;
     height:55px;
 
     border:none;
-
     border-radius:12px;
 
-    background:#4f46e5;
+    background:var(--card);
+
+    border:1px solid var(--border);
 
     color:var(--text);
 
-    font-size:18px;
+    font-size:22px;
 
+    cursor:pointer;
+
+    transition:0.2s;
+
+}
+
+.file-button:hover{
+
+    background:var(--hover);
+
+}
+
+.file-button:disabled{
+
+    opacity:0.5;
+
+    cursor:not-allowed;
+
+}
+
+.send-button{
+
+    width:120px;
+    height:55px;
+
+    border:none;
+    border-radius:12px;
+
+    background:var(--primary);
+
+    color:white;
+
+    font-size:18px;
     font-weight:600;
 
     cursor:pointer;
 
-    transition:0.3s;
+    transition:0.2s;
 
 }
 
-.message-input button:hover{
+.send-button:hover{
 
-    background:#4338ca;
+    opacity:0.9;
+
+}
+
+.send-button:disabled{
+
+    opacity:0.5;
+
+    cursor:not-allowed;
+
+}
+
+.attached-document{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    margin:0 20px 10px;
+
+    padding:10px 14px;
+
+    background:var(--card);
+
+    border:1px solid var(--border);
+
+    border-radius:10px;
+
+    color:var(--text);
+
+}
+
+.attached-document button{
+
+    border:none;
+
+    background:transparent;
+
+    color:var(--secondary-text);
+
+    font-size:16px;
+
+    cursor:pointer;
 
 }
