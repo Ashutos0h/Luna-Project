@@ -1,4 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 
 import ChatBubble from "../components/ChatBubble";
 import MessageInput from "../components/MessageInput";
@@ -6,30 +10,104 @@ import MessageInput from "../components/MessageInput";
 import "../styles/Chat.css";
 
 import { sendMessage } from "../services/chatService";
+
+import {
+  loadMemories,
+  addMemory,
+} from "../services/memoryStorage";
+
 import { readDocument } from "../services/documentService";
 
-function Chat({ conversation, updateMessages, settings }) {
 
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
+function Chat({
+  conversation,
+  updateMessages,
+  settings,
+}) {
 
-  const [document, setDocument] = useState(null);
-  const [documentMode, setDocumentMode] = useState(false);
+  const [messages, setMessages] =
+    useState(
+      () => conversation?.messages || []
+    );
 
-  const bottomRef = useRef(null);
+  const [loading, setLoading] =
+    useState(false);
 
 
-  // Load selected conversation
-  useEffect(() => {
+  const [document, setDocument] =
+    useState(null);
 
-    if (conversation) {
-      setMessages(conversation.messages);
+  const [documentMode, setDocumentMode] =
+    useState(false);
+
+
+  const bottomRef =
+    useRef(null);
+
+
+  // ==============================
+  // Handle Memory Command
+  // ==============================
+
+  function handleMemoryCommand(text) {
+
+    const prefix =
+      "remember that";
+
+
+    const lowerText =
+      text.toLowerCase().trim();
+
+
+    if (
+      !lowerText.startsWith(prefix)
+    ) {
+
+      return false;
+
     }
 
-  }, [conversation]);
+
+    const memoryText =
+      text
+        .trim()
+        .substring(prefix.length)
+        .trim();
 
 
-  // Auto scroll
+    if (!memoryText) {
+
+      return false;
+
+    }
+
+
+    addMemory({
+
+      id: Date.now(),
+
+      title: "User Memory",
+
+      value: memoryText,
+
+    });
+
+
+    console.log(
+      "Memory created:",
+      memoryText
+    );
+
+
+    return true;
+
+  }
+
+
+  // ==============================
+  // Auto Scroll
+  // ==============================
+
   useEffect(() => {
 
     bottomRef.current?.scrollIntoView({
@@ -47,19 +125,26 @@ function Chat({ conversation, updateMessages, settings }) {
 
     try {
 
-     const loadedDocument = await readDocument(file);
+      const loadedDocument =
+        await readDocument(file);
 
-      setDocument(loadedDocument);
+
+      setDocument(
+        loadedDocument
+      );
+
 
       console.log(
         "Document loaded:",
         loadedDocument.name
       );
 
+
       console.log(
         "Document content:",
         loadedDocument.content
       );
+
 
       console.log(
         "Document content length:",
@@ -73,7 +158,10 @@ function Chat({ conversation, updateMessages, settings }) {
         error
       );
 
-      alert(error.message);
+
+      alert(
+        error.message
+      );
 
     }
 
@@ -86,8 +174,74 @@ function Chat({ conversation, updateMessages, settings }) {
 
   async function handleSend(text) {
 
-    if (!text.trim()) return;
+    if (!text.trim()) {
 
+      return;
+
+    }
+
+
+    // ==============================
+    // Memory Command
+    // ==============================
+
+    const memoryCreated =
+      handleMemoryCommand(text);
+
+
+    if (memoryCreated) {
+
+      const userMessage = {
+
+        id: Date.now(),
+
+        sender: "user",
+
+        text,
+
+      };
+
+
+      const assistantMessage = {
+
+        id: Date.now() + 1,
+
+        sender: "assistant",
+
+        text:
+          "Got it. I'll remember that.",
+
+      };
+
+
+      const finalMessages = [
+
+        ...messages,
+
+        userMessage,
+
+        assistantMessage,
+
+      ];
+
+
+      setMessages(
+        finalMessages
+      );
+
+      updateMessages(
+        finalMessages
+      );
+
+
+      return;
+
+    }
+
+
+    // ==============================
+    // Normal User Message
+    // ==============================
 
     const userMessage = {
 
@@ -109,9 +263,13 @@ function Chat({ conversation, updateMessages, settings }) {
     ];
 
 
-    setMessages(updatedMessages);
+    setMessages(
+      updatedMessages
+    );
 
-    updateMessages(updatedMessages);
+    updateMessages(
+      updatedMessages
+    );
 
     setLoading(true);
 
@@ -150,14 +308,34 @@ ${document.content}
 
 
       // ==============================
+      // Load Memories
+      // ==============================
+
+      const memories =
+        loadMemories();
+
+
+      console.log(
+        "Memories being sent:",
+        memories
+      );
+
+
+      // ==============================
       // Send to AI
       // ==============================
 
-      const reply = await sendMessage(
-        text,
-        documentContext
-      );
+      const reply =
+        await sendMessage(
+          text,
+          documentContext,
+          memories
+        );
 
+
+      // ==============================
+      // Assistant Message
+      // ==============================
 
       const assistantMessage = {
 
@@ -179,14 +357,21 @@ ${document.content}
       ];
 
 
-      setMessages(finalMessages);
+      setMessages(
+        finalMessages
+      );
 
-      updateMessages(finalMessages);
+      updateMessages(
+        finalMessages
+      );
 
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        "Chat error:",
+        error
+      );
 
 
       const errorMessage = {
@@ -195,7 +380,8 @@ ${document.content}
 
         sender: "assistant",
 
-        text: "Something went wrong.",
+        text:
+          "Something went wrong.",
 
       };
 
@@ -209,9 +395,13 @@ ${document.content}
       ];
 
 
-      setMessages(finalMessages);
+      setMessages(
+        finalMessages
+      );
 
-      updateMessages(finalMessages);
+      updateMessages(
+        finalMessages
+      );
 
 
     } finally {
@@ -244,6 +434,10 @@ ${document.content}
   }
 
 
+  // ==============================
+  // UI
+  // ==============================
+
   return (
 
     <div className="chat-container">
@@ -264,23 +458,36 @@ ${document.content}
 
       <div className="chat-messages">
 
-        {messages.map((message) => (
+        {messages.map(
+          (message) => (
 
-          <ChatBubble
-            key={message.id}
-            sender={message.sender}
-            text={message.text}
-          />
+            <ChatBubble
 
-        ))}
+              key={message.id}
+
+              sender={
+                message.sender
+              }
+
+              text={
+                message.text
+              }
+
+            />
+
+          )
+        )}
 
 
         {loading && (
 
           <div className="typing-message">
 
-            {settings?.assistantName ||
-              "Luna"}{" "}
+            {
+              settings?.assistantName ||
+              "Luna"
+            }{" "}
+
             is typing...
 
           </div>
@@ -288,18 +495,19 @@ ${document.content}
         )}
 
 
-        <div ref={bottomRef}></div>
+        <div
+          ref={bottomRef}
+        />
 
       </div>
 
 
-      {/* ============================== */}
-      {/* Document Attachment */}
-      {/* ============================== */}
+      {/* Document */}
 
       {document && (
 
         <div className="chat-document">
+
 
           <div className="chat-document-info">
 
@@ -308,30 +516,37 @@ ${document.content}
           </div>
 
 
-          {/* Document Mode */}
-
           <button
+
             type="button"
+
             className="chat-document-mode"
+
             onClick={() =>
               setDocumentMode(
                 !documentMode
               )
             }
+
           >
 
             {documentMode
+
               ? "📄 Document Mode ON"
-              : "📄 Ask Document"}
+
+              : "📄 Ask Document"
+
+            }
 
           </button>
 
 
-          {/* Remove Document */}
-
           <button
+
             type="button"
+
             className="chat-document-remove"
+
             onClick={() => {
 
               setDocument(null);
@@ -339,11 +554,13 @@ ${document.content}
               setDocumentMode(false);
 
             }}
+
           >
 
             ✕
 
           </button>
+
 
         </div>
 
@@ -356,16 +573,20 @@ ${document.content}
 
         onSend={handleSend}
 
-        onFileSelect={handleFileSelect}
+        onFileSelect={
+          handleFileSelect
+        }
 
         disabled={loading}
 
       />
+
 
     </div>
 
   );
 
 }
+
 
 export default Chat;

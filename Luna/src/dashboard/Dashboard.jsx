@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 import { loadSettings } from "../services/settingsStorage";
 
 import Sidebar from "./Sidebar";
@@ -15,12 +16,13 @@ import {
   saveConversations,
 } from "../services/chatStorage";
 
-function Dashboard() {
 
-  // Welcome message
-const [settings, setSettings] = useState(loadSettings());
+// ==============================
+// Welcome Message
+// ==============================
 
-function createWelcomeMessage() {
+function createWelcomeMessage(settings) {
+
   return {
     id: Date.now(),
     sender: "assistant",
@@ -28,65 +30,111 @@ function createWelcomeMessage() {
       settings.assistantName || "Luna"
     }. How can I help you today?`,
   };
+
 }
 
-  // Sidebar Pages
-  const [currentPage, setCurrentPage] = useState("chat");
 
- 
+function Dashboard() {
 
-  useEffect(() => {
-  document.body.setAttribute(
-    "data-theme",
-    settings.theme
-  );
-}, [settings]);
+  // ==============================
+  // Settings
+  // ==============================
 
+  const [settings, setSettings] =
+    useState(() => loadSettings());
+
+
+  // ==============================
+  // Sidebar Page
+  // ==============================
+
+  const [currentPage, setCurrentPage] =
+    useState("chat");
+
+
+  // ==============================
+  // Load Existing Conversations
+  // ==============================
+
+  const initialChats =
+    loadConversations();
+
+
+  // ==============================
   // Conversations
-  const [conversations, setConversations] = useState([]);
+  // ==============================
 
-  // Selected conversation
-  const [activeChatId, setActiveChatId] = useState(null);
+  const [conversations, setConversations] =
+    useState(() => {
 
-  // Load chats on startup
-  useEffect(() => {
+      if (initialChats.length > 0) {
 
-    const savedSettings = loadSettings();
+        return initialChats;
 
-setSettings(savedSettings);
+      }
 
-document.body.setAttribute(
-  "data-theme",
-  savedSettings.theme
-);
-
-    const savedChats = loadConversations();
-
-    if (savedChats.length > 0) {
-
-      setConversations(savedChats);
-
-      setActiveChatId(savedChats[0].id);
-
-    } else {
 
       const firstChat = {
+
         id: Date.now(),
+
         title: "New Chat",
-        messages: [createWelcomeMessage()],
+
+        messages: [
+          createWelcomeMessage(settings)
+        ],
+
       };
 
-      setConversations([firstChat]);
 
-      setActiveChatId(firstChat.id);
+      saveConversations([
+        firstChat
+      ]);
 
-      saveConversations([firstChat]);
 
-    }
+      return [
+        firstChat
+      ];
 
-  }, []);
+    });
 
+
+  // ==============================
+  // Active Conversation
+  // ==============================
+
+  const [activeChatId, setActiveChatId] =
+    useState(() => {
+
+      if (initialChats.length > 0) {
+
+        return initialChats[0].id;
+
+      }
+
+      return null;
+
+    });
+
+
+  // ==============================
+  // Apply Theme
+  // ==============================
+
+  useEffect(() => {
+
+    document.body.setAttribute(
+      "data-theme",
+      settings.theme
+    );
+
+  }, [settings.theme]);
+
+
+  // ==============================
   // Create New Chat
+  // ==============================
+
   function createNewChat() {
 
     const newChat = {
@@ -95,9 +143,12 @@ document.body.setAttribute(
 
       title: "New Chat",
 
-      messages: [createWelcomeMessage()],
+      messages: [
+        createWelcomeMessage(settings)
+      ],
 
     };
+
 
     const updatedChats = [
 
@@ -107,17 +158,28 @@ document.body.setAttribute(
 
     ];
 
-    setConversations(updatedChats);
 
-    setActiveChatId(newChat.id);
+    setConversations(
+      updatedChats
+    );
 
-    saveConversations(updatedChats);
+    setActiveChatId(
+      newChat.id
+    );
+
+    saveConversations(
+      updatedChats
+    );
 
     setCurrentPage("chat");
 
   }
 
+
+  // ==============================
   // Select Previous Chat
+  // ==============================
+
   function selectChat(id) {
 
     setActiveChatId(id);
@@ -126,61 +188,91 @@ document.body.setAttribute(
 
   }
 
+
+  // ==============================
   // Update Messages
+  // ==============================
+
   function updateMessages(messages) {
 
-    const updatedChats = conversations.map(chat => {
+    const updatedChats =
+      conversations.map(chat => {
 
-      if (chat.id !== activeChatId) {
+        if (
+          chat.id !== activeChatId
+        ) {
 
-        return chat;
+          return chat;
 
-      }
+        }
 
-      let title = chat.title;
 
-      const firstUserMessage = messages.find(
-        msg => msg.sender === "user"
-      );
+        let title =
+          chat.title;
 
-      if (
-        title === "New Chat" &&
-        firstUserMessage
-      ) {
 
-        title =
-          firstUserMessage.text.length > 30
-            ? firstUserMessage.text.substring(0, 30) + "..."
-            : firstUserMessage.text;
+        const firstUserMessage =
+          messages.find(
+            msg =>
+              msg.sender === "user"
+          );
 
-      }
 
-      return {
+        if (
+          title === "New Chat" &&
+          firstUserMessage
+        ) {
 
-        ...chat,
+          title =
+            firstUserMessage.text.length > 30
+              ? firstUserMessage.text.substring(
+                  0,
+                  30
+                ) + "..."
+              : firstUserMessage.text;
 
-        title,
+        }
 
-        messages,
 
-      };
+        return {
 
-    });
+          ...chat,
 
-    setConversations(updatedChats);
+          title,
 
-    saveConversations(updatedChats);
+          messages,
+
+        };
+
+      });
+
+
+    setConversations(
+      updatedChats
+    );
+
+    saveConversations(
+      updatedChats
+    );
 
   }
 
+
+  // ==============================
   // Delete Chat
+  // ==============================
+
   function deleteChat(id) {
 
-    const updatedChats = conversations.filter(
-      chat => chat.id !== id
-    );
+    const updatedChats =
+      conversations.filter(
+        chat => chat.id !== id
+      );
 
-    if (updatedChats.length === 0) {
+
+    if (
+      updatedChats.length === 0
+    ) {
 
       const firstChat = {
 
@@ -188,85 +280,177 @@ document.body.setAttribute(
 
         title: "New Chat",
 
-        messages: [createWelcomeMessage()],
+        messages: [
+          createWelcomeMessage(settings)
+        ],
 
       };
 
-      setConversations([firstChat]);
 
-      setActiveChatId(firstChat.id);
+      setConversations([
+        firstChat
+      ]);
 
-      saveConversations([firstChat]);
+      setActiveChatId(
+        firstChat.id
+      );
+
+      saveConversations([
+        firstChat
+      ]);
 
       return;
 
     }
 
-    setConversations(updatedChats);
 
-    setActiveChatId(updatedChats[0].id);
+    setConversations(
+      updatedChats
+    );
 
-    saveConversations(updatedChats);
+    setActiveChatId(
+      updatedChats[0].id
+    );
+
+    saveConversations(
+      updatedChats
+    );
 
   }
 
-  // Clear All Chats By One Click
+
+  // ==============================
+  // Clear All Chats
+  // ==============================
+
   function clearAllChats() {
- console.log("Dashboard function called");
-  const firstChat = { 
-  
 
-    id: Date.now(),
+    console.log(
+      "Dashboard function called"
+    );
 
-    title: "New Chat",
 
-    messages: [createWelcomeMessage()],
+    const firstChat = {
 
-  };
+      id: Date.now(),
 
-  setConversations([firstChat]);
+      title: "New Chat",
 
-  setActiveChatId(firstChat.id);
+      messages: [
+        createWelcomeMessage(settings)
+      ],
 
-  setCurrentPage("chat");
+    };
 
-  saveConversations([firstChat]);
 
-}
+    setConversations([
+      firstChat
+    ]);
 
+    setActiveChatId(
+      firstChat.id
+    );
+
+    setCurrentPage("chat");
+
+    saveConversations([
+      firstChat
+    ]);
+
+  }
+
+
+  // ==============================
   // Active Conversation
-  const activeConversation = conversations.find(
-    chat => chat.id === activeChatId
-  );
+  // ==============================
+
+  const activeConversation =
+    conversations.find(
+      chat =>
+        chat.id === activeChatId
+    );
+
+
+  // ==============================
+  // UI
+  // ==============================
 
   return (
 
     <div className="dashboard">
 
-<Sidebar
-    currentPage={currentPage}
-    setCurrentPage={setCurrentPage}
 
-    settings={settings}
+      <Sidebar
 
-    conversations={conversations}
-    activeChatId={activeChatId}
-    onNewChat={createNewChat}
-    onSelectChat={selectChat}
-    onDeleteChat={deleteChat}
-/>
+        currentPage={
+          currentPage
+        }
+
+        setCurrentPage={
+          setCurrentPage
+        }
+
+        settings={
+          settings
+        }
+
+        conversations={
+          conversations
+        }
+
+        activeChatId={
+          activeChatId
+        }
+
+        onNewChat={
+          createNewChat
+        }
+
+        onSelectChat={
+          selectChat
+        }
+
+        onDeleteChat={
+          deleteChat
+        }
+
+      />
+
 
       <div className="content">
 
-{currentPage === "chat" && activeConversation && (
 
-    <Chat
-        conversation={activeConversation}
-        updateMessages={updateMessages}
-        settings={settings}
-    />
+        {/* ============================== */}
+        {/* Chat */}
+        {/* ============================== */}
 
-)}
+        {currentPage === "chat" &&
+          activeConversation && (
+
+            <Chat
+
+              key={activeChatId}
+
+              conversation={
+                activeConversation
+              }
+
+              updateMessages={
+                updateMessages
+              }
+
+              settings={
+                settings
+              }
+
+            />
+
+        )}
+
+
+        {/* ============================== */}
+        {/* Memory */}
+        {/* ============================== */}
 
         {currentPage === "memory" && (
 
@@ -274,28 +458,49 @@ document.body.setAttribute(
 
         )}
 
-{currentPage === "setting" && (
 
-    <Setting
+        {/* ============================== */}
+        {/* Settings */}
+        {/* ============================== */}
 
-        onSettingsSaved={(updatedSettings) => {
+        {currentPage === "setting" && (
 
-            setSettings(updatedSettings);
+          <Setting
 
-            document.body.setAttribute(
-                "data-theme",
-                updatedSettings.theme
-            );
+            onSettingsSaved={
+              (updatedSettings) => {
 
-        }}
+                setSettings(
+                  updatedSettings
+                );
 
-    />
 
-)}
+                document.body.setAttribute(
+                  "data-theme",
+                  updatedSettings.theme
+                );
+
+              }
+            }
+
+          />
+
+        )}
+
+
+        {/* ============================== */}
+        {/* Privacy */}
+        {/* ============================== */}
 
         {currentPage === "privacy" && (
 
-          <Privacy onClearChats={clearAllChats} />
+          <Privacy
+
+            onClearChats={
+              clearAllChats
+            }
+
+          />
 
         )}
 
@@ -306,5 +511,6 @@ document.body.setAttribute(
   );
 
 }
+
 
 export default Dashboard;

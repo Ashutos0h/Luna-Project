@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
 import "../styles/Setting.css";
 
 import {
@@ -8,32 +9,36 @@ import {
   getDefaultSettings,
 } from "../services/settingsStorage";
 
+
 function Setting({ onSettingsSaved }) {
 
-  const [settings, setSettings] = useState(getDefaultSettings());
+  const [settings, setSettings] =
+    useState(() => loadSettings());
 
-  useEffect(() => {
-
-    const savedSettings = loadSettings();
-
-    setSettings(savedSettings);
-
-  }, []);
 
   function handleChange(e) {
 
-    const { name, value } = e.target;
+    const {
+      name,
+      value,
+    } = e.target;
+
 
     setSettings((prev) => ({
+
       ...prev,
+
       [name]: value,
+
     }));
 
   }
 
+
   function handleSave() {
 
     saveSettings(settings);
+
 
     if (onSettingsSaved) {
 
@@ -41,13 +46,19 @@ function Setting({ onSettingsSaved }) {
 
     }
 
-    alert("✅ Settings saved successfully!");
+
+    alert(
+      "✅ Settings saved successfully!"
+    );
 
   }
 
+
   function handleReset() {
 
-    const defaults = getDefaultSettings();
+    const defaults =
+      getDefaultSettings();
+
 
     resetSettings();
 
@@ -55,15 +66,20 @@ function Setting({ onSettingsSaved }) {
 
     setSettings(defaults);
 
+
     if (onSettingsSaved) {
 
       onSettingsSaved(defaults);
 
     }
 
-    alert("✅ Settings reset successfully!");
+
+    alert(
+      "✅ Settings reset successfully!"
+    );
 
   }
+
 
   return (
 
@@ -71,104 +87,168 @@ function Setting({ onSettingsSaved }) {
 
       <h1>⚙️ Settings</h1>
 
+
       {/* User Name */}
 
       <div className="setting-group">
 
-        <label>User Name</label>
+        <label>
+          User Name
+        </label>
 
         <input
+
           type="text"
+
           name="userName"
+
           value={settings.userName}
+
           onChange={handleChange}
+
         />
 
       </div>
+
 
       {/* Assistant Name */}
 
       <div className="setting-group">
 
-        <label>Assistant Name</label>
+        <label>
+          Assistant Name
+        </label>
 
         <input
+
           type="text"
+
           name="assistantName"
-          value={settings.assistantName}
+
+          value={
+            settings.assistantName
+          }
+
           onChange={handleChange}
+
         />
 
       </div>
+
 
       {/* Language */}
 
       <div className="setting-group">
 
-        <label>Language</label>
+        <label>
+          Language
+        </label>
 
         <select
+
           name="language"
+
           value={settings.language}
+
           onChange={handleChange}
+
         >
 
-          <option value="English">English</option>
-          <option value="Hindi">Hindi</option>
+          <option value="English">
+            English
+          </option>
+
+          <option value="Hindi">
+            Hindi
+          </option>
 
         </select>
 
       </div>
+
 
       {/* Profession */}
 
       <div className="setting-group">
 
-        <label>Profession</label>
+        <label>
+          Profession
+        </label>
 
         <select
+
           name="profession"
+
           value={settings.profession}
+
           onChange={handleChange}
+
         >
 
-          <option value="Student">Student</option>
-          <option value="Employee">Employee</option>
-          <option value="Founder">Founder</option>
+          <option value="Student">
+            Student
+          </option>
+
+          <option value="Employee">
+            Employee
+          </option>
+
+          <option value="Founder">
+            Founder
+          </option>
 
         </select>
 
       </div>
+
 
       {/* Theme */}
 
       <div className="setting-group">
 
-        <label>Theme</label>
+        <label>
+          Theme
+        </label>
 
         <select
+
           name="theme"
+
           value={settings.theme}
+
           onChange={handleChange}
+
         >
 
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
+          <option value="dark">
+            Dark
+          </option>
+
+          <option value="light">
+            Light
+          </option>
 
         </select>
 
       </div>
 
+
       {/* AI Model */}
 
       <div className="setting-group">
 
-        <label>AI Model</label>
+        <label>
+          AI Model
+        </label>
 
         <select
+
           name="aiModel"
+
           value={settings.aiModel}
+
           onChange={handleChange}
+
         >
 
           <option value="qwen2.5:3b">
@@ -191,18 +271,26 @@ function Setting({ onSettingsSaved }) {
 
       </div>
 
+
       <div className="button-group">
 
         <button
+
           className="save-btn"
+
           onClick={handleSave}
+
         >
           Save Settings
         </button>
 
+
         <button
+
           className="reset-btn"
+
           onClick={handleReset}
+
         >
           Reset Settings
         </button>
@@ -214,5 +302,6 @@ function Setting({ onSettingsSaved }) {
   );
 
 }
+
 
 export default Setting;

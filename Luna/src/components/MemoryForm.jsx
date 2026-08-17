@@ -1,45 +1,50 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 function MemoryForm({
   onSave,
   editingMemory,
 }) {
 
-  const [title, setTitle] = useState("");
-  const [value, setValue] = useState("");
+  const [title, setTitle] = useState(
+    editingMemory?.title || ""
+  );
 
-  useEffect(() => {
+  const [value, setValue] = useState(
+    editingMemory?.value || ""
+  );
 
-    if (editingMemory) {
-
-      setTitle(editingMemory.title);
-
-      setValue(editingMemory.value);
-
-    }
-
-  }, [editingMemory]);
 
   function handleSubmit(e) {
 
     e.preventDefault();
 
-    if (!title.trim() || !value.trim()) {
+    if (
+      !title.trim() ||
+      !value.trim()
+    ) {
       return;
     }
 
+
     onSave({
+
       id: editingMemory
         ? editingMemory.id
         : Date.now(),
+
       title,
+
       value,
+
     });
 
+
     setTitle("");
+
     setValue("");
 
   }
+
 
   return (
 
@@ -77,6 +82,7 @@ function MemoryForm({
     </form>
 
   );
+
 }
 
 export default MemoryForm;

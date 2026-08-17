@@ -1,17 +1,22 @@
-import { loadMemories } from "./memoryStorage";
-import { loadSettings } from "./settingsStorage";
-
-export async function sendMessage(message, documentContext = "") {
+export async function sendMessage(
+    message,
+    documentContext = "",
+    memories = []
+) {
 
     try {
 
-        const response = await window.electronAPI.sendMessage({
+        const response =
+            await window.electronAPI.sendMessage({
 
-            message: message,
+                message: message,
 
-            documentContext: documentContext,
+                documentContext:
+                    documentContext,
 
-        });
+                memories: memories,
+
+            });
 
         return response;
 
