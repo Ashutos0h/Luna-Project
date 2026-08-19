@@ -33,7 +33,6 @@ function Chat({
   const [loading, setLoading] =
     useState(false);
 
-
   const [document, setDocument] =
     useState(null);
 

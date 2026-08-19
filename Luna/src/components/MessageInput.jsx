@@ -80,16 +80,20 @@ function MessageInput({
 
             {/* Message Input */}
 
-            <input
-                type="text"
-                placeholder="Type your message..."
-                value={message}
-                disabled={disabled}
-                onChange={(e) =>
-                    setMessage(e.target.value)
-                }
-                onKeyDown={handleKeyDown}
-            />
+        <input
+    type="text"
+    placeholder="Type your message..."
+    value={message}
+    disabled={disabled}
+    autoComplete="off"
+
+
+        onChange={(e) =>
+    setMessage(e.target.value)
+}
+
+onKeyDown={handleKeyDown}
+/>
 
             {/* Send */}
 

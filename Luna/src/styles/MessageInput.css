@@ -1,15 +1,21 @@
-.message-input{
+.message-input {
+    display: flex;
 
-    display:flex;
+    align-items: center;
 
-    align-items:center;
+    gap: 15px;
 
-    gap:15px;
- 
-    padding:20px;
+    padding: 20px;
 
-background: var(--card);
-border:1px solid var(--border);
+    background: var(--card);
+
+    border: 1px solid var(--border);
+
+    flex-shrink: 0;
+
+    position: relative;
+
+    z-index: 10;
 }
 
 .message-input input{

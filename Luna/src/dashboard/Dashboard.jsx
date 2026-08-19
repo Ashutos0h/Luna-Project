@@ -424,28 +424,14 @@ function Dashboard() {
         {/* Chat */}
         {/* ============================== */}
 
-        {currentPage === "chat" &&
-          activeConversation && (
-
-            <Chat
-
-              key={activeChatId}
-
-              conversation={
-                activeConversation
-              }
-
-              updateMessages={
-                updateMessages
-              }
-
-              settings={
-                settings
-              }
-
-            />
-
-        )}
+        {currentPage === "chat" && activeConversation && (
+    <Chat
+        key={activeChatId}
+        conversation={activeConversation}
+        updateMessages={updateMessages}
+        settings={settings}
+    />
+)}
 
 
         {/* ============================== */}

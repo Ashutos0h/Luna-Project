@@ -1,16 +1,38 @@
 {
-  "name": "luna",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "main": "electron/main.js",
+"name": "luna",
+"private": true,
+"version": "1.0.0",
+"description": "Luna - A local AI desktop assistant powered by Ollama",
+"author": "Luna Project",
+"type": "module",
+"main": "electron/main.js",
+
   "scripts": {
     "dev": "vite",
     "electron": "electron .",
     "build": "vite build",
+    "dist": "npm run build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview"
   },
+
+"build": {
+  "appId": "com.luna.ai",
+  "productName": "Luna",
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "directories": {
+    "output": "release"
+  },
+"win": {
+  "target": "nsis",
+  "icon": "assets/luna.ico"
+}
+},
+
   "dependencies": {
     "axios": "^1.19.0",
     "react": "^19.2.7",
