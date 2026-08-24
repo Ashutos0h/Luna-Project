@@ -1,1 +1,5 @@
 Luna/release/
+Luna/node_modules/
+Luna/dist/
+Luna/.env
+Luna/*.log
