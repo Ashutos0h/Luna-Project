@@ -15,6 +15,9 @@ function Setting({ onSettingsSaved }) {
   const [settings, setSettings] =
     useState(() => loadSettings());
 
+  const [notification, setNotification] =
+    useState("");
+
 
   function handleChange(e) {
 
@@ -35,6 +38,19 @@ function Setting({ onSettingsSaved }) {
   }
 
 
+  function showNotification(msg) {
+
+    setNotification(msg);
+
+    setTimeout(() => {
+
+      setNotification("");
+
+    }, 3000);
+
+  }
+
+
   function handleSave() {
 
     saveSettings(settings);
@@ -47,8 +63,8 @@ function Setting({ onSettingsSaved }) {
     }
 
 
-    alert(
-      "✅ Settings saved successfully!"
+    showNotification(
+      "Settings saved successfully!"
     );
 
   }
@@ -74,8 +90,8 @@ function Setting({ onSettingsSaved }) {
     }
 
 
-    alert(
-      "✅ Settings reset successfully!"
+    showNotification(
+      "Settings reset successfully!"
     );
 
   }
@@ -85,7 +101,18 @@ function Setting({ onSettingsSaved }) {
 
     <div className="settings-container">
 
-      <h1>⚙️ Settings</h1>
+      <h1>Settings</h1>
+
+
+      {notification && (
+
+        <div className="setting-toast">
+
+          {notification}
+
+        </div>
+
+      )}
 
 
       {/* User Name */}

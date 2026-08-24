@@ -1,90 +1,121 @@
+import { useState } from "react";
 import "../styles/Privacy.css";
 import { clearMemory } from "../services/memoryStorage";
 import { resetSettings } from "../services/settingsStorage";
-import { clearConversations } from "../services/chatStorage";
-import { exportConversations } from "../services/chatStorage";
-import { importConversations } from "../services/chatStorage";
+import { clearConversations, exportConversations, importConversations } from "../services/chatStorage";
+import { useNavigate } from "react-router-dom";
 
-import {useNavigate} from "react-router-dom";
+function Privacy({ onClearChats }) {
 
-function Privacy({onClearChats}) {
+  const [notification, setNotification] = useState("");
+  const [confirmModal, setConfirmModal] = useState(null);
+  const navigate = useNavigate();
 
-  // Clear function Making
-function handleClearChats() {
-  console.log("Button Clicked")
-  const confirmDelete = window.confirm("Are you sure you want to delete all conversations?");
-  
-  if (!confirmDelete) {
-    return;
-  }
-  console.log("Calling Dashboard")
-  onClearChats();
-
-}
-
-// Clear Memory Function
-function handleClearMemory(){
-  const confirmDelete = window.confirm("Are you sure you want to clear all memories?");
-
-  if(!confirmDelete){
-    return;
+  function showNotification(msg) {
+    setNotification(msg);
+    setTimeout(() => {
+      setNotification("");
+    }, 3000);
   }
 
-  clearMemory();
-  alert("All memories have been cleared.");
-}
-
-// Reset Luna Function
-
-const navigate = useNavigate();
-
-function handleResetLuna(){
-  const confirmReset = window.confirm("This will delete all chats, memories and settings.\n\nContinue?");
-
-  if(!confirmReset){
-    return;
+  function handleClearChats() {
+    setConfirmModal({
+      type: "chats",
+      title: "Clear All Conversations?",
+      message: "Are you sure you want to delete all conversations? This action cannot be undone.",
+    });
   }
 
-  resetSettings();
-  clearMemory();
-  clearConversations();
+  function handleClearMemory() {
+    setConfirmModal({
+      type: "memories",
+      title: "Clear All Memories?",
+      message: "Are you sure you want to clear all stored memories?",
+    });
+  }
 
-  navigate("/setup");
-}
+  function handleResetLuna() {
+    setConfirmModal({
+      type: "reset",
+      title: "Reset Luna?",
+      message: "This will delete all conversations, memories, and settings and return Luna to initial setup.",
+    });
+  }
 
-// Handle Export Chats
-function handleExportChats(){
-  exportConversations();
-}
+  function handleConfirmAction() {
+    if (!confirmModal) return;
+    const actionType = confirmModal.type;
+    setConfirmModal(null);
 
-// Handle Import Converstaions
+    if (actionType === "chats") {
+      onClearChats();
+    } else if (actionType === "memories") {
+      clearMemory();
+      showNotification("All memories have been cleared.");
+    } else if (actionType === "reset") {
+      resetSettings();
+      clearMemory();
+      clearConversations();
+      navigate("/setup");
+    }
+  }
 
-async function handleImportChats(event){
+  function handleExportChats() {
+    exportConversations();
+    showNotification("Conversations exported successfully.");
+  }
+
+  async function handleImportChats(event) {
     const file = event.target.files[0];
+    if (!file) return;
 
-    // if user chooses nothing file and cancel or if file is invalid or null
-    if(!file){
-        return;
-    }
-
-    // for safety purpose
-    try{
-        await importConversations(file);
-        alert("Conversations imported successfully.");
+    try {
+      await importConversations(file);
+      showNotification("Conversations imported successfully.");
+      setTimeout(() => {
         window.location.reload();
+      }, 1000);
+    } catch {
+      showNotification("Invalid JSON file.");
     }
-
-    catch{
-        alert("Invalid JSON file.");
-    }
-}
-
+  }
 
   return (
 
     <div className="privacy-container">
 
-      <h1>🔒 Privacy & Data</h1>
+      <h1>Privacy & Data</h1>
+
+      {notification && (
+        <div className="privacy-toast">
+          {notification}
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="confirm-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p>{confirmModal.message}</p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="confirm-cancel-btn"
+                onClick={() => setConfirmModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm-danger-btn"
+                onClick={handleConfirmAction}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="privacy-intro">
         Luna is designed to protect your privacy.
@@ -93,15 +124,15 @@ async function handleImportChats(event){
 
       <div className="privacy-card">
 
-        <h2>📁 Stored Locally</h2>
+        <h2>Stored Locally</h2>
 
         <ul>
 
-          <li>💬 Conversations</li>
+          <li>Conversations</li>
           
-          <li>🧠 Memories</li>
+          <li>Memories</li>
  
-          <li>⚙️ Settings</li>
+          <li>Settings</li>
 
         </ul>
 
@@ -109,7 +140,7 @@ async function handleImportChats(event){
 
       <div className="privacy-card">
 
-        <h2>🤖 AI Processing</h2>
+        <h2>AI Processing</h2>
 
         <p>
 
@@ -125,7 +156,7 @@ async function handleImportChats(event){
 
       <div className="privacy-card">
 
-        <h2>☁ Cloud Storage</h2>
+        <h2>Cloud Storage</h2>
 
         <p>
 
@@ -139,7 +170,7 @@ async function handleImportChats(event){
 {/* // Clear Chats Button */}
       <div className="privacy-card">
 
-        <h2>🔐 Your Control</h2>
+        <h2>Your Control</h2>
 
         <p>
 
@@ -150,7 +181,7 @@ async function handleImportChats(event){
         <button className="danger-btn"
         onClick={handleClearChats}
         >
-          🗑 Clear All Conversations
+          Clear All Conversations
         </button>
 
       </div>
@@ -161,7 +192,7 @@ async function handleImportChats(event){
 
       <div className="privacy-card">
 
-    <h2>🧠 Memory</h2>
+    <h2>Memory</h2>
 
     <p>
         Luna stores important information in memory to provide a better
@@ -172,7 +203,7 @@ async function handleImportChats(event){
         className="danger-btn"
         onClick={handleClearMemory}
     >
-        🧠 Clear All Memories
+        Clear All Memories
     </button>
 
 </div>
@@ -182,7 +213,7 @@ async function handleImportChats(event){
 
       <div className="privacy-card">
 
-  <h2>♻ Reset Luna</h2>
+  <h2>Reset Luna</h2>
 
   <p>
 
@@ -197,7 +228,7 @@ async function handleImportChats(event){
     onClick={handleResetLuna}
   >
 
-    ♻ Reset Luna
+    Reset Luna
 
   </button>
 
@@ -208,14 +239,14 @@ async function handleImportChats(event){
 {/* Export Button */}
 <div className="privacy-card">
 
-    <h2>📤 Export Conversations</h2>
+    <h2>Export Conversations</h2>
 
     <p>Download all conversations as a JSON backup. </p>
 
     <button
         className="primary-btn"
         onClick={handleExportChats} >
-        📤 Export
+        Export
     </button>
 
 </div>
@@ -224,7 +255,7 @@ async function handleImportChats(event){
 
 <div className="privacy-card">
 
-    <h2>📥 Import Conversations</h2>
+    <h2>Import Conversations</h2>
 
     <p>Restore conversations from a backup.</p>
 

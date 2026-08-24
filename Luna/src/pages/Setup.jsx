@@ -11,6 +11,7 @@ function Setup() {
   const [language, setLanguage] = useState("");
   const [profession, setProfession] = useState("");
   const [theme, setTheme] = useState("");
+  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
@@ -19,27 +20,27 @@ function Setup() {
     e.preventDefault();
 
     if (!userName.trim()) {
-      alert("Please enter your name.");
+      setError("Please enter your name.");
       return;
     }
 
     if (!assistantName.trim()) {
-      alert("Please enter assistant name.");
+      setError("Please enter assistant name.");
       return;
     }
 
     if (!language) {
-      alert("Please select a language.");
+      setError("Please select a language.");
       return;
     }
 
     if (!profession) {
-      alert("Please select a profession.");
+      setError("Please select a profession.");
       return;
     }
 
     if (!theme) {
-      alert("Please select a theme.");
+      setError("Please select a theme.");
       return;
     }
 
@@ -61,7 +62,13 @@ function Setup() {
 
       <div className="setup-card">
 
-        <h1>🌙 Setup Luna</h1>
+        <h1>Setup Luna</h1>
+
+        {error && (
+          <div style={{ color: "#ef4444", marginBottom: "15px", textAlign: "center", fontWeight: "600" }}>
+            {error}
+          </div>
+        )}
 
         <p className="setup-subtitle">
           Let's personalize your assistant.

@@ -14,7 +14,7 @@ function Sidebar({
     <div className="sidebar">
 
       {/* Logo */}
-     <h1 className="logo"> 🌙 {settings.assistantName}</h1>
+     <h1 className="logo">{settings.assistantName}</h1>
 
      <p className="user-name">
     Welcome, {settings.userName}
@@ -39,7 +39,7 @@ function Sidebar({
           }
           onClick={() => setCurrentPage("chat")}
         >
-          💬 Chat
+          Chat
         </button>
 
         <button
@@ -50,7 +50,7 @@ function Sidebar({
           }
           onClick={() => setCurrentPage("memory")}
         >
-          🧠 Memory
+          Memory
         </button>
 
         <button
@@ -61,7 +61,7 @@ function Sidebar({
           }
           onClick={() => setCurrentPage("setting")}
         >
-          ⚙️ Settings
+          Settings
         </button>
 
         <button
@@ -72,7 +72,7 @@ function Sidebar({
           }
           onClick={() => setCurrentPage("privacy")}
         >
-          🔒 Privacy
+          Privacy
         </button>
 
       </div>

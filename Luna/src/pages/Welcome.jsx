@@ -10,7 +10,7 @@ function Welcome() {
 
       <div className="welcome-card">
 
-        <h1>🌙 Luna</h1>
+        <h1>Luna</h1>
 
         <h2>Your Local AI Desktop Assistant</h2>
 

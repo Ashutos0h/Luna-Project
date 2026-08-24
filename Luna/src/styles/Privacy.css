@@ -13,6 +13,17 @@
     margin-bottom: 10px;
 }
 
+.privacy-toast {
+    margin-bottom: 20px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    background: #10b981;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    max-width: 500px;
+}
+
 .privacy-intro {
  color: var(--secondary-text);
  margin-bottom: 30px;
@@ -88,4 +99,77 @@
 
     background:#4338ca;
 
+}
+
+/* Confirm Modal Overlay */
+.confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.confirm-modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 16px;
+    padding: 30px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.confirm-modal h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 22px;
+}
+
+.confirm-modal p {
+    color: var(--secondary-text);
+    margin-bottom: 25px;
+    line-height: 1.5;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.confirm-cancel-btn {
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.confirm-cancel-btn:hover {
+    background: var(--hover);
+}
+
+.confirm-danger-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #dc2626;
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.confirm-danger-btn:hover {
+    background: #b91c1c;
 }

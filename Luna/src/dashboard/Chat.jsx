@@ -2,6 +2,7 @@ import {
   useState,
   useEffect,
   useRef,
+  useMemo,
 } from "react";
 
 import ChatBubble from "../components/ChatBubble";
@@ -16,8 +17,108 @@ import {
   addMemory,
 } from "../services/memoryStorage";
 
-import { readDocument } from "../services/documentService";
+import {
+  readDocument,
+} from "../services/documentService";
 
+
+// ============================================================
+// Desktop Command Detection
+// ============================================================
+
+function detectDesktopCommand(text) {
+
+  const lower =
+    text
+      .toLowerCase()
+      .trim();
+
+
+  // ==============================
+  // Search Web
+  // ==============================
+
+  const searchPatterns = [
+
+    /^search (?:google|the web|web|browser) (?:for )?(.+)$/i,
+
+    /^search (?:for )?(.+) (?:on google|on the web|in browser)$/i,
+
+    /^google (.+)$/i,
+
+    /^search this on (?:google|the browser|browser):?\s*(.+)$/i,
+
+    /^search (?:this|it) (?:on )?(?:google|the web|browser)$/i,
+
+  ];
+
+
+  for (
+    const pattern of searchPatterns
+  ) {
+
+    const match =
+      lower.match(pattern);
+
+
+    if (match) {
+
+      const query =
+        match[1]?.trim();
+
+
+      if (query) {
+
+        return {
+          type: "search_web",
+          query,
+        };
+
+      }
+
+    }
+
+  }
+
+
+  // ==============================
+  // Open Any Desktop Application
+  // ==============================
+
+  const openMatch =
+    text
+      .trim()
+      .match(/^(?:open|launch|start|run)\s+(?:the\s+)?(.+)$/i);
+
+
+  if (openMatch) {
+
+    const appName =
+      openMatch[1]
+        .trim()
+        .replace(/[?.!]+$/, "");
+
+
+    if (appName) {
+
+      return {
+        type: "open_app",
+        app: appName,
+      };
+
+    }
+
+  }
+
+
+  return null;
+
+}
+
+
+// ============================================================
+// Chat Component
+// ============================================================
 
 function Chat({
   conversation,
@@ -25,19 +126,28 @@ function Chat({
   settings,
 }) {
 
-  const [messages, setMessages] =
-    useState(
-      () => conversation?.messages || []
-    );
+  const messages = useMemo(
+    () => conversation?.messages || [],
+    [conversation?.messages]
+  );
 
-  const [loading, setLoading] =
-    useState(false);
 
-  const [document, setDocument] =
-    useState(null);
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
 
-  const [documentMode, setDocumentMode] =
-    useState(false);
+
+  const [
+    document,
+    setDocument,
+  ] = useState(null);
+
+
+  const [
+    documentMode,
+    setDocumentMode,
+  ] = useState(false);
 
 
   const bottomRef =
@@ -45,21 +155,27 @@ function Chat({
 
 
   // ==============================
-  // Handle Memory Command
+  // Memory Command
   // ==============================
 
-  function handleMemoryCommand(text) {
+  function handleMemoryCommand(
+    text
+  ) {
 
     const prefix =
       "remember that";
 
 
     const lowerText =
-      text.toLowerCase().trim();
+      text
+        .toLowerCase()
+        .trim();
 
 
     if (
-      !lowerText.startsWith(prefix)
+      !lowerText.startsWith(
+        prefix
+      )
     ) {
 
       return false;
@@ -70,7 +186,9 @@ function Chat({
     const memoryText =
       text
         .trim()
-        .substring(prefix.length)
+        .substring(
+          prefix.length
+        )
         .trim();
 
 
@@ -85,17 +203,13 @@ function Chat({
 
       id: Date.now(),
 
-      title: "User Memory",
+      title:
+        "User Memory",
 
-      value: memoryText,
+      value:
+        memoryText,
 
     });
-
-
-    console.log(
-      "Memory created:",
-      memoryText
-    );
 
 
     return true;
@@ -120,7 +234,9 @@ function Chat({
   // File Upload
   // ==============================
 
-  async function handleFileSelect(file) {
+  async function handleFileSelect(
+    file
+  ) {
 
     try {
 
@@ -133,36 +249,131 @@ function Chat({
       );
 
 
-      console.log(
-        "Document loaded:",
-        loadedDocument.name
-      );
-
-
-      console.log(
-        "Document content:",
-        loadedDocument.content
-      );
-
-
-      console.log(
-        "Document content length:",
-        loadedDocument.content.length
-      );
-
     } catch (error) {
 
       console.error(
-        "File upload error:",
-        error
-      );
-
-
-      alert(
-        error.message
+        "File upload failed: " + error.message
       );
 
     }
+
+  }
+
+
+  // ============================================================
+  // Desktop Command
+  // ============================================================
+
+  async function handleDesktopCommand(
+    command
+  ) {
+
+    if (
+      !window.electronAPI
+    ) {
+
+      return false;
+
+    }
+
+
+    // ==============================
+    // Open App
+    // ==============================
+
+    if (
+      command.type ===
+      "open_app"
+    ) {
+
+      const result =
+        await window.electronAPI.openApp(
+          command.app
+        );
+
+
+      const assistantMessage = {
+
+        id:
+          Date.now(),
+
+        sender:
+          "assistant",
+
+        text:
+          result.message,
+
+      };
+
+
+      const finalMessages = [
+
+        ...messages,
+
+        assistantMessage,
+
+      ];
+
+
+      updateMessages(
+        finalMessages
+      );
+
+
+      return true;
+
+    }
+
+
+    // ==============================
+    // Search Web
+    // ==============================
+
+    if (
+      command.type ===
+      "search_web"
+    ) {
+
+      const result =
+        await window.electronAPI.searchWeb(
+          command.query
+        );
+
+
+      const assistantMessage = {
+
+        id:
+          Date.now(),
+
+        sender:
+          "assistant",
+
+        text:
+          result.message,
+
+      };
+
+
+      const finalMessages = [
+
+        ...messages,
+
+        assistantMessage,
+
+      ];
+
+
+      updateMessages(
+        finalMessages
+      );
+
+
+      return true;
+
+    }
+
+
+    return false;
 
   }
 
@@ -171,30 +382,141 @@ function Chat({
   // Send Message
   // ==============================
 
-  async function handleSend(text) {
+  async function handleSend(
+    text
+  ) {
 
-    if (!text.trim()) {
+    if (
+      !text.trim()
+    ) {
 
       return;
 
     }
 
 
-    // ==============================
-    // Memory Command
-    // ==============================
+    // ============================================================
+    // DESKTOP COMMAND CHECK
+    // ============================================================
 
-    const memoryCreated =
-      handleMemoryCommand(text);
+    const desktopCommand =
+      detectDesktopCommand(
+        text
+      );
 
 
-    if (memoryCreated) {
+    if (
+      desktopCommand
+    ) {
+
+      // First show user's command
 
       const userMessage = {
 
-        id: Date.now(),
+        id:
+          Date.now(),
 
-        sender: "user",
+        sender:
+          "user",
+
+        text,
+
+      };
+
+
+      const updatedMessages = [
+
+        ...messages,
+
+        userMessage,
+
+      ];
+
+
+      updateMessages(
+        updatedMessages
+      );
+
+
+      // Execute command
+
+      setLoading(true);
+
+
+      try {
+
+        await handleDesktopCommand(
+          desktopCommand
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Desktop command error:",
+          error
+        );
+
+
+        const errorMessage = {
+
+          id:
+            Date.now() + 1,
+
+          sender:
+            "assistant",
+
+          text:
+            "I couldn't complete that desktop action.",
+
+        };
+
+
+        const finalMessages = [
+
+          ...updatedMessages,
+
+          errorMessage,
+
+        ];
+
+
+        updateMessages(
+          finalMessages
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+
+      return;
+
+    }
+
+
+    // ============================================================
+    // MEMORY COMMAND
+    // ============================================================
+
+    const memoryCreated =
+      handleMemoryCommand(
+        text
+      );
+
+
+    if (
+      memoryCreated
+    ) {
+
+      const userMessage = {
+
+        id:
+          Date.now(),
+
+        sender:
+          "user",
 
         text,
 
@@ -203,9 +525,11 @@ function Chat({
 
       const assistantMessage = {
 
-        id: Date.now() + 1,
+        id:
+          Date.now() + 1,
 
-        sender: "assistant",
+        sender:
+          "assistant",
 
         text:
           "Got it. I'll remember that.",
@@ -224,10 +548,6 @@ function Chat({
       ];
 
 
-      setMessages(
-        finalMessages
-      );
-
       updateMessages(
         finalMessages
       );
@@ -238,15 +558,17 @@ function Chat({
     }
 
 
-    // ==============================
-    // Normal User Message
-    // ==============================
+    // ============================================================
+    // NORMAL USER MESSAGE
+    // ============================================================
 
     const userMessage = {
 
-      id: Date.now(),
+      id:
+        Date.now(),
 
-      sender: "user",
+      sender:
+        "user",
 
       text,
 
@@ -262,13 +584,10 @@ function Chat({
     ];
 
 
-    setMessages(
-      updatedMessages
-    );
-
     updateMessages(
       updatedMessages
     );
+
 
     setLoading(true);
 
@@ -300,35 +619,29 @@ ${document.content}
       }
 
 
-      console.log(
-        "Document Context:",
-        documentContext
-      );
-
-
       // ==============================
-      // Load Memories
+      // Memories
       // ==============================
 
       const memories =
         loadMemories();
 
 
-      console.log(
-        "Memories being sent:",
-        memories
-      );
-
-
       // ==============================
-      // Send to AI
+      // Ollama
       // ==============================
 
       const reply =
         await sendMessage(
+
           text,
+
           documentContext,
-          memories
+
+          memories,
+
+          settings?.aiModel || "qwen2.5:3b"
+
         );
 
 
@@ -338,11 +651,14 @@ ${document.content}
 
       const assistantMessage = {
 
-        id: Date.now() + 1,
+        id:
+          Date.now() + 1,
 
-        sender: "assistant",
+        sender:
+          "assistant",
 
-        text: reply,
+        text:
+          reply,
 
       };
 
@@ -355,10 +671,6 @@ ${document.content}
 
       ];
 
-
-      setMessages(
-        finalMessages
-      );
 
       updateMessages(
         finalMessages
@@ -375,9 +687,11 @@ ${document.content}
 
       const errorMessage = {
 
-        id: Date.now() + 2,
+        id:
+          Date.now() + 2,
 
-        sender: "assistant",
+        sender:
+          "assistant",
 
         text:
           "Something went wrong.",
@@ -393,10 +707,6 @@ ${document.content}
 
       ];
 
-
-      setMessages(
-        finalMessages
-      );
 
       updateMessages(
         finalMessages
@@ -442,7 +752,7 @@ ${document.content}
     <div className="chat-container">
 
 
-      {/* Chat Header */}
+      {/* Header */}
 
       <div className="chat-header">
 
@@ -462,7 +772,9 @@ ${document.content}
 
             <ChatBubble
 
-              key={message.id}
+              key={
+                message.id
+              }
 
               sender={
                 message.sender
@@ -507,10 +819,9 @@ ${document.content}
 
         <div className="chat-document">
 
-
           <div className="chat-document-info">
 
-            📄 {document.name}
+            {document.name}
 
           </div>
 
@@ -531,9 +842,9 @@ ${document.content}
 
             {documentMode
 
-              ? "📄 Document Mode ON"
+              ? "Document Mode ON"
 
-              : "📄 Ask Document"
+              : "Ask Document"
 
             }
 
@@ -550,7 +861,9 @@ ${document.content}
 
               setDocument(null);
 
-              setDocumentMode(false);
+              setDocumentMode(
+                false
+              );
 
             }}
 
@@ -559,7 +872,6 @@ ${document.content}
             ✕
 
           </button>
-
 
         </div>
 
@@ -570,16 +882,19 @@ ${document.content}
 
       <MessageInput
 
-        onSend={handleSend}
+        onSend={
+          handleSend
+        }
 
         onFileSelect={
           handleFileSelect
         }
 
-        disabled={loading}
+        disabled={
+          loading
+        }
 
       />
-
 
     </div>
 

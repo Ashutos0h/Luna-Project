@@ -17,15 +17,17 @@ import {
 } from "../services/chatStorage";
 
 
-// ==============================
+// ============================================================
 // Welcome Message
-// ==============================
+// ============================================================
 
 function createWelcomeMessage(settings) {
 
   return {
     id: Date.now(),
+
     sender: "assistant",
+
     text: `Hello! I'm ${
       settings.assistantName || "Luna"
     }. How can I help you today?`,
@@ -34,40 +36,46 @@ function createWelcomeMessage(settings) {
 }
 
 
+// ============================================================
+// Dashboard
+// ============================================================
+
 function Dashboard() {
 
-  // ==============================
+  // ==========================================================
   // Settings
-  // ==============================
+  // ==========================================================
 
   const [settings, setSettings] =
     useState(() => loadSettings());
 
 
-  // ==============================
-  // Sidebar Page
-  // ==============================
+  // ==========================================================
+  // Current Page
+  // ==========================================================
 
   const [currentPage, setCurrentPage] =
     useState("chat");
 
 
-  // ==============================
-  // Load Existing Conversations
-  // ==============================
+  // ==========================================================
+  // Load Conversations
+  // ==========================================================
 
   const initialChats =
     loadConversations();
 
 
-  // ==============================
+  // ==========================================================
   // Conversations
-  // ==============================
+  // ==========================================================
 
   const [conversations, setConversations] =
     useState(() => {
 
-      if (initialChats.length > 0) {
+      if (
+        initialChats.length > 0
+      ) {
 
         return initialChats;
 
@@ -99,14 +107,16 @@ function Dashboard() {
     });
 
 
-  // ==============================
+  // ==========================================================
   // Active Conversation
-  // ==============================
+  // ==========================================================
 
   const [activeChatId, setActiveChatId] =
     useState(() => {
 
-      if (initialChats.length > 0) {
+      if (
+        initialChats.length > 0
+      ) {
 
         return initialChats[0].id;
 
@@ -117,9 +127,9 @@ function Dashboard() {
     });
 
 
-  // ==============================
+  // ==========================================================
   // Apply Theme
-  // ==============================
+  // ==========================================================
 
   useEffect(() => {
 
@@ -131,9 +141,12 @@ function Dashboard() {
   }, [settings.theme]);
 
 
-  // ==============================
+
+
+
+  // ==========================================================
   // Create New Chat
-  // ==============================
+  // ==========================================================
 
   function createNewChat() {
 
@@ -151,11 +164,8 @@ function Dashboard() {
 
 
     const updatedChats = [
-
       ...conversations,
-
       newChat,
-
     ];
 
 
@@ -163,22 +173,27 @@ function Dashboard() {
       updatedChats
     );
 
+
     setActiveChatId(
       newChat.id
     );
+
 
     saveConversations(
       updatedChats
     );
 
-    setCurrentPage("chat");
+
+    setCurrentPage(
+      "chat"
+    );
 
   }
 
 
-  // ==============================
-  // Select Previous Chat
-  // ==============================
+  // ==========================================================
+  // Select Chat
+  // ==========================================================
 
   function selectChat(id) {
 
@@ -189,67 +204,72 @@ function Dashboard() {
   }
 
 
-  // ==============================
+  // ==========================================================
   // Update Messages
-  // ==============================
+  // ==========================================================
 
   function updateMessages(messages) {
 
     const updatedChats =
-      conversations.map(chat => {
+      conversations.map(
+        (chat) => {
 
-        if (
-          chat.id !== activeChatId
-        ) {
+          if (
+            chat.id !== activeChatId
+          ) {
 
-          return chat;
+            return chat;
+
+          }
+
+
+          let title =
+            chat.title;
+
+
+          const firstUserMessage =
+            messages.find(
+              (msg) =>
+                msg.sender === "user"
+            );
+
+
+          if (
+            title === "New Chat" &&
+            firstUserMessage
+          ) {
+
+            title =
+              firstUserMessage.text.length > 30
+
+                ? firstUserMessage.text.substring(
+                    0,
+                    30
+                  ) + "..."
+
+                : firstUserMessage.text;
+
+          }
+
+
+          return {
+
+            ...chat,
+
+            title,
+
+            messages,
+
+          };
 
         }
-
-
-        let title =
-          chat.title;
-
-
-        const firstUserMessage =
-          messages.find(
-            msg =>
-              msg.sender === "user"
-          );
-
-
-        if (
-          title === "New Chat" &&
-          firstUserMessage
-        ) {
-
-          title =
-            firstUserMessage.text.length > 30
-              ? firstUserMessage.text.substring(
-                  0,
-                  30
-                ) + "..."
-              : firstUserMessage.text;
-
-        }
-
-
-        return {
-
-          ...chat,
-
-          title,
-
-          messages,
-
-        };
-
-      });
+      );
 
 
     setConversations(
       updatedChats
     );
+
 
     saveConversations(
       updatedChats
@@ -258,15 +278,16 @@ function Dashboard() {
   }
 
 
-  // ==============================
+  // ==========================================================
   // Delete Chat
-  // ==============================
+  // ==========================================================
 
   function deleteChat(id) {
 
     const updatedChats =
       conversations.filter(
-        chat => chat.id !== id
+        (chat) =>
+          chat.id !== id
       );
 
 
@@ -291,13 +312,18 @@ function Dashboard() {
         firstChat
       ]);
 
+
       setActiveChatId(
         firstChat.id
       );
 
+
       saveConversations([
         firstChat
       ]);
+
+
+      setCurrentPage("chat");
 
       return;
 
@@ -308,20 +334,25 @@ function Dashboard() {
       updatedChats
     );
 
+
     setActiveChatId(
       updatedChats[0].id
     );
+
 
     saveConversations(
       updatedChats
     );
 
+
+    setCurrentPage("chat");
+
   }
 
 
-  // ==============================
+  // ==========================================================
   // Clear All Chats
-  // ==============================
+  // ==========================================================
 
   function clearAllChats() {
 
@@ -347,96 +378,84 @@ function Dashboard() {
       firstChat
     ]);
 
+
     setActiveChatId(
       firstChat.id
     );
 
-    setCurrentPage("chat");
 
     saveConversations([
       firstChat
     ]);
 
+
+    setCurrentPage("chat");
+
   }
 
 
-  // ==============================
+  // ==========================================================
   // Active Conversation
-  // ==============================
+  // ==========================================================
 
   const activeConversation =
     conversations.find(
-      chat =>
+      (chat) =>
         chat.id === activeChatId
-    );
+    ) || conversations[0];
 
 
-  // ==============================
+  // ==========================================================
   // UI
-  // ==============================
+  // ==========================================================
 
   return (
 
     <div className="dashboard">
 
-
       <Sidebar
 
-        currentPage={
-          currentPage
-        }
+        currentPage={currentPage}
 
-        setCurrentPage={
-          setCurrentPage
-        }
+        setCurrentPage={setCurrentPage}
 
-        settings={
-          settings
-        }
+        settings={settings}
 
-        conversations={
-          conversations
-        }
+        conversations={conversations}
 
-        activeChatId={
-          activeChatId
-        }
+        activeChatId={activeChatId}
 
-        onNewChat={
-          createNewChat
-        }
+        onNewChat={createNewChat}
 
-        onSelectChat={
-          selectChat
-        }
+        onSelectChat={selectChat}
 
-        onDeleteChat={
-          deleteChat
-        }
+        onDeleteChat={deleteChat}
 
       />
 
 
       <div className="content">
 
-
-        {/* ============================== */}
+        {/* ================================================== */}
         {/* Chat */}
-        {/* ============================== */}
+        {/* ================================================== */}
 
-        {currentPage === "chat" && activeConversation && (
+{currentPage === "chat" &&
+  activeConversation && (
+
     <Chat
-        key={activeChatId}
-        conversation={activeConversation}
-        updateMessages={updateMessages}
-        settings={settings}
+      key={activeChatId}
+      conversation={activeConversation}
+      updateMessages={updateMessages}
+      settings={settings}
     />
+
 )}
 
 
-        {/* ============================== */}
+        {/* ================================================== */}
         {/* Memory */}
-        {/* ============================== */}
+        {/* ================================================== */}
 
         {currentPage === "memory" && (
 
@@ -445,9 +464,9 @@ function Dashboard() {
         )}
 
 
-        {/* ============================== */}
+        {/* ================================================== */}
         {/* Settings */}
-        {/* ============================== */}
+        {/* ================================================== */}
 
         {currentPage === "setting" && (
 
@@ -474,9 +493,9 @@ function Dashboard() {
         )}
 
 
-        {/* ============================== */}
+        {/* ================================================== */}
         {/* Privacy */}
-        {/* ============================== */}
+        {/* ================================================== */}
 
         {currentPage === "privacy" && (
 
