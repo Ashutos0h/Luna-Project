@@ -30,11 +30,15 @@ function MemoryForm({
 
       id: editingMemory
         ? editingMemory.id
-        : Date.now(),
+        : `memory-${window.crypto.randomUUID()}`,
 
-      title,
+      title: title.trim(),
 
-      value,
+      value: value.trim(),
+
+      source: editingMemory?.source || "manual",
+
+      createdAt: editingMemory?.createdAt || Date.now(),
 
     });
 
@@ -60,6 +64,7 @@ function MemoryForm({
         onChange={(e) =>
           setTitle(e.target.value)
         }
+        maxLength={100}
       />
 
       <input
@@ -69,6 +74,7 @@ function MemoryForm({
         onChange={(e) =>
           setValue(e.target.value)
         }
+        maxLength={2000}
       />
 
       <button type="submit">

@@ -1,9 +1,29 @@
-import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_DOCUMENT_CHARS = 60000;
+let pdfJsPromise;
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+function loadPdfJs() {
+    if (!pdfJsPromise) {
+        pdfJsPromise = Promise.all([
+            import("pdfjs-dist"),
+            import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+        ]).then(([pdfjsLib, workerModule]) => {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
+            return pdfjsLib;
+        });
+    }
 
-const MAX_FILE_SIZE = 100 * 1024;
+    return pdfJsPromise;
+}
+
+function prepareDocument(name, content) {
+    const truncated = content.length > MAX_DOCUMENT_CHARS;
+    return {
+        name,
+        content: truncated ? content.slice(0, MAX_DOCUMENT_CHARS) : content,
+        truncated,
+    };
+}
 
 
 // ==============================
@@ -29,10 +49,7 @@ function readTxtFile(file) {
                 return;
             }
 
-            resolve({
-                name: file.name,
-                content: content,
-            });
+            resolve(prepareDocument(file.name, content));
 
         };
 
@@ -58,6 +75,8 @@ function readTxtFile(file) {
 async function readPdfFile(file) {
 
     try {
+
+        const pdfjsLib = await loadPdfJs();
 
         const arrayBuffer =
             await file.arrayBuffer();
@@ -89,6 +108,10 @@ async function readPdfFile(file) {
             fullText +=
                 `\n\n--- Page ${pageNumber} ---\n\n${pageText}`;
 
+            if (fullText.length > MAX_DOCUMENT_CHARS) {
+                break;
+            }
+
         }
 
         if (!fullText.trim()) {
@@ -99,10 +122,7 @@ async function readPdfFile(file) {
 
         }
 
-        return {
-            name: file.name,
-            content: fullText,
-        };
+        return prepareDocument(file.name, fullText);
 
     } catch (error) {
 
@@ -135,13 +155,13 @@ export async function readDocument(file) {
 
 
     // ==============================
-    // 100 KB LIMIT
+    // Keep browser parsing bounded while allowing normal PDFs.
     // ==============================
 
     if (file.size > MAX_FILE_SIZE) {
 
         throw new Error(
-            "File is too large. Please upload a file smaller than 100 KB."
+            "File is too large. Please upload a file smaller than 5 MB."
         );
 
     }

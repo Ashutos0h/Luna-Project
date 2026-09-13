@@ -53,9 +53,9 @@ function Memory() {
     }
 
 
-    setMemories(updatedMemories);
+    if (!saveMemories(updatedMemories)) return;
 
-    saveMemories(updatedMemories);
+    setMemories(updatedMemories);
 
     setEditingMemory(null);
 
@@ -74,9 +74,9 @@ function Memory() {
       );
 
 
-    setMemories(updated);
+    if (!saveMemories(updated)) return;
 
-    saveMemories(updated);
+    setMemories(updated);
 
   }
 
@@ -97,6 +97,8 @@ function Memory() {
     <div className="memory-page">
 
       <h1>Memory</h1>
+
+      <p className="memory-intro">Save useful details Luna can reference in future conversations.</p>
 
 
       <MemoryForm

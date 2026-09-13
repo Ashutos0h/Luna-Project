@@ -10,6 +10,13 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+release
+dist-portable
+dist-app
+dist-nsis
+build-output
+installer-output
+.npm-uacc-cache
 *.local
 
 # Editor directories and files

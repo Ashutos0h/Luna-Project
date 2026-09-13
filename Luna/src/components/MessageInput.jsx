@@ -11,6 +11,9 @@ function MessageInput({
   onSend,
   disabled = false,
   onFileSelect,
+  generating = false,
+  onStop,
+  settings,
 }) {
 
   // ============================================================
@@ -109,6 +112,8 @@ function MessageInput({
 
     setMessage("");
 
+    if (inputRef.current) inputRef.current.style.height = "44px";
+
 
     setTimeout(focusInput, 50);
 
@@ -201,6 +206,9 @@ function MessageInput({
       event.target.value
     );
 
+    event.target.style.height = "44px";
+    event.target.style.height = `${Math.min(event.target.scrollHeight, 140)}px`;
+
   };
 
 
@@ -210,6 +218,7 @@ function MessageInput({
 
   return (
 
+    <div className="composer-shell">
     <div className="message-input" onClick={focusInput}>
 
 
@@ -273,17 +282,16 @@ function MessageInput({
       {/* Message Input */}
       {/* ====================================================== */}
 
-      <input
+      <textarea
 
         ref={
           inputRef
         }
 
-        type="text"
-
         className="chat-message-input"
 
-        placeholder="Type your message..."
+        placeholder={`Message ${settings?.assistantName || "Luna"}…`}
+        aria-label={`Message ${settings?.assistantName || "Luna"}`}
 
         value={
           message
@@ -301,9 +309,9 @@ function MessageInput({
           disabled
         }
 
-        autoComplete="off"
+        spellCheck
 
-        spellCheck="true"
+        rows={1}
 
         tabIndex={0}
 
@@ -318,25 +326,46 @@ function MessageInput({
 
         type="button"
 
-        className="send-button"
+        className={`send-button${generating ? " stop-button" : ""}`}
 
         onClick={(e) => {
           e.stopPropagation();
-          handleSend();
+          if (generating) onStop?.();
+          else handleSend();
         }}
 
         disabled={
-          disabled ||
-          !message.trim()
+          generating
+            ? !onStop
+            : disabled || !message.trim()
         }
+
+        aria-label={generating ? "Stop generating" : "Send message"}
 
       >
 
-        Send
+        {generating ? (
+          <>
+            <span>Stop</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          </>
+        ) : (
+          <>
+            <span>Send</span>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          </>
+        )}
 
       </button>
 
 
+
+    </div>
     </div>
 
   );

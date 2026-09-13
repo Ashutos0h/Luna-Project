@@ -7,7 +7,10 @@ function MemoryCard({
 
     <div className="memory-card">
 
-      <h3>{memory.title}</h3>
+      <div className="memory-card-heading">
+        <h3>{memory.title}</h3>
+        {memory.source === "assistant" && <span>Auto-saved</span>}
+      </div>
 
       <p>{memory.value}</p>
 

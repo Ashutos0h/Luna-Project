@@ -1,11 +1,26 @@
-import { Routes, Route } from "react-router-dom";
+import {
+  Navigate,
+  Routes,
+  Route,
+  useLocation,
+} from "react-router-dom";
 
-import Welcome from "./pages/Welcome";
 import Setup from "./pages/Setup";
 
-import Dashboard from "./Dashboard/Dashboard";
+import Dashboard from "./dashboard/Dashboard";
+
+import {
+  hasCompletedSetup,
+} from "./services/settingsStorage";
 
 function App() {
+
+  // Subscribe to navigation so a privacy reset immediately re-evaluates the
+  // saved setup state before routing back to /setup.
+  useLocation();
+
+  const setupCompleted =
+    hasCompletedSetup();
 
   return (
 
@@ -13,17 +28,39 @@ function App() {
 
       <Route
         path="/"
-        element={<Welcome />}
+        element={
+          <Navigate
+            to={
+              setupCompleted
+                ? "/dashboard"
+                : "/setup"
+            }
+            replace
+          />
+        }
       />
 
       <Route
         path="/setup"
-        element={<Setup />}
+        element={
+          setupCompleted
+            ? <Navigate to="/dashboard" replace />
+            : <Setup />
+        }
       />
 
       <Route
         path="/dashboard"
-        element={<Dashboard />}
+        element={
+          setupCompleted
+            ? <Dashboard />
+            : <Navigate to="/setup" replace />
+        }
+      />
+
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
       />
 
     </Routes>

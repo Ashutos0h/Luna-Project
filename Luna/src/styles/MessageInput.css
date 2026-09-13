@@ -1,159 +1,26 @@
+.composer-shell { width: min(900px,calc(100% - 48px)); flex-shrink: 0; margin: 0 auto 12px; position: relative; z-index: 12; }
 .message-input {
-    display: flex;
-
-    align-items: center;
-
-    gap: 15px;
-
-    padding: 20px;
-
-    background: var(--card);
-
-    border: 1px solid var(--border);
-
-    flex-shrink: 0;
-
-    position: relative;
-
-    z-index: 10;
+  width: 100%; min-height: 72px; display: flex; align-items: flex-end; gap: 9px;
+  margin: 0; padding: 13px; background: color-mix(in srgb,var(--card) 94%,transparent); border: 1px solid var(--border-strong);
+  border-radius: 21px; box-shadow: 0 18px 55px rgba(0,0,0,.15),0 1px 0 rgba(255,255,255,.05) inset; flex-shrink: 0; position: relative;
+  backdrop-filter: blur(22px) saturate(120%);
+  transition: border-color .18s ease, box-shadow .18s ease;
 }
-
-.message-input input{
-
-    flex:1;
-
-    height:55px;
-
-    padding:0 18px;
-
-    font-size:16px;
-
-    background:var(--card);
-
-    color:var(--text);
-
-    border:1px solid var(--border);
-
-    border-radius:12px;
-
-    outline:none;
-
-}
-
-.message-input input::placeholder{
-
-    color:var(--secondary-text);
-
-}
-
-
-.hidden-file-input{
-    display:none;
-}
-
-.file-button{
-
-    width:55px;
-    height:55px;
-
-    border:none;
-    border-radius:12px;
-
-    background:var(--card);
-
-    border:1px solid var(--border);
-
-    color:var(--text);
-
-    font-size:22px;
-
-    cursor:pointer;
-
-    transition:0.2s;
-
-}
-
-.file-button:hover{
-
-    background:var(--hover);
-
-}
-
-.file-button:disabled{
-
-    opacity:0.5;
-
-    cursor:not-allowed;
-
-}
-
-.send-button{
-
-    width:120px;
-    height:55px;
-
-    border:none;
-    border-radius:12px;
-
-    background:var(--primary);
-
-    color:white;
-
-    font-size:18px;
-    font-weight:600;
-
-    cursor:pointer;
-
-    transition:0.2s;
-
-}
-
-.send-button:hover{
-
-    opacity:0.9;
-
-}
-
-.send-button:disabled{
-
-    opacity:0.5;
-
-    cursor:not-allowed;
-
-}
-
-.attached-document{
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:space-between;
-
-    margin:0 20px 10px;
-
-    padding:10px 14px;
-
-    background:var(--card);
-
-    border:1px solid var(--border);
-
-    border-radius:10px;
-
-    color:var(--text);
-
-}
-
-.attached-document button{
-
-    border:none;
-
-    background:transparent;
-
-    color:var(--secondary-text);
-
-    font-size:16px;
-
-    cursor:pointer;
-
+.message-input:focus-within { border-color: color-mix(in srgb,var(--primary) 58%,var(--border)); box-shadow: 0 20px 65px rgba(0,0,0,.17),0 0 0 3px var(--primary-soft); }
+.message-input textarea.chat-message-input { flex: 1; min-width: 0; height: 44px; max-height: 140px; padding: 10px 8px; overflow-y: auto; resize: none; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; line-height: 1.55; }
+.message-input textarea::placeholder { color: var(--secondary-text); }
+.hidden-file-input { display: none; }
+.file-button, .send-button { height: 42px; border: 0; border-radius: 12px; cursor: pointer; transition: .16s ease; }
+.file-button { width: 42px; display: grid; place-items: center; flex-shrink: 0; border: 1px solid var(--border); background: var(--card-muted); color: var(--secondary-text); }
+.file-button:hover { border-color: color-mix(in srgb,var(--primary) 28%,var(--border)); background: var(--primary-soft); color: var(--primary); }
+.send-button { min-width: 94px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 15px; background: linear-gradient(135deg,#8978ff,#6552e8); color: white; font-weight: 730; box-shadow: 0 8px 20px var(--primary-glow); }
+.send-button:hover:not(:disabled) { background: linear-gradient(135deg,#988aff,#715ff0); transform: translateY(-1px); box-shadow: 0 11px 26px var(--primary-glow); }
+.send-button.stop-button { background: #ef4444; box-shadow: 0 5px 14px rgba(239,68,68,.2); }
+.send-button.stop-button:hover:not(:disabled) { background: #dc2626; }
+.file-button:disabled, .send-button:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+@media (max-width: 720px) {
+  .composer-shell { width: calc(100% - 28px); margin-bottom: 8px; }
+  .message-input { border-radius: 17px; }
+  .send-button { min-width: 44px; width: 44px; padding: 0; }
+  .send-button span { display: none; }
 }

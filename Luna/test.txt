@@ -1,7 +1,0 @@
-My name is Ashu.
-
-I am a B.Tech CSE student.
-
-I am building a desktop AI assistant called Luna.
-
-Luna uses React, Electron and Ollama.

@@ -1,0 +1,82 @@
+.model-download-status {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+  color: var(--secondary-text);
+  font-size: 13px;
+}
+
+.model-download-status.state-complete {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.model-download-status.state-error {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.model-download-status-row,
+.model-download-metrics,
+.model-download-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-download-status-row {
+  justify-content: space-between;
+}
+
+.model-download-status-row p {
+  margin: 0;
+  color: var(--text);
+}
+
+.model-download-status-row strong {
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.model-download-metrics {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.model-download-controls {
+  margin-top: 10px;
+}
+
+.model-retry-btn,
+.model-download-status .model-cancel-btn {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 12px;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.model-retry-btn {
+  background: var(--primary);
+}
+
+.model-download-status .model-cancel-btn {
+  background: #ef4444;
+}
+
+.model-download-details {
+  margin-top: 9px;
+  word-break: break-word;
+}
+
+.model-download-details summary {
+  cursor: pointer;
+}
+
+.model-download-details span {
+  display: block;
+  margin-top: 5px;
+}

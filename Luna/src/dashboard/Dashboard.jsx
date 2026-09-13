@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { loadSettings } from "../services/settingsStorage";
+import { loadSettings, resetSettings } from "../services/settingsStorage";
 
 import Sidebar from "./Sidebar";
 import Chat from "./Chat";
@@ -12,9 +13,11 @@ import Privacy from "../pages/Privacy";
 import "../styles/Dashboard.css";
 
 import {
+  exportConversation,
   loadConversations,
   saveConversations,
 } from "../services/chatStorage";
+import { cancelMessage } from "../services/chatService";
 
 
 // ============================================================
@@ -24,7 +27,7 @@ import {
 function createWelcomeMessage(settings) {
 
   return {
-    id: Date.now(),
+    id: `message-${window.crypto.randomUUID()}`,
 
     sender: "assistant",
 
@@ -41,6 +44,8 @@ function createWelcomeMessage(settings) {
 // ============================================================
 
 function Dashboard() {
+
+  const navigate = useNavigate();
 
   // ==========================================================
   // Settings
@@ -59,32 +64,23 @@ function Dashboard() {
 
 
   // ==========================================================
-  // Load Conversations
-  // ==========================================================
-
-  const initialChats =
-    loadConversations();
-
-
-  // ==========================================================
   // Conversations
   // ==========================================================
 
   const [conversations, setConversations] =
     useState(() => {
 
-      if (
-        initialChats.length > 0
-      ) {
+      const storedChats = loadConversations();
 
-        return initialChats;
+      if (storedChats.length > 0) {
+        return storedChats;
 
       }
 
 
       const firstChat = {
 
-        id: Date.now(),
+        id: `chat-${window.crypto.randomUUID()}`,
 
         title: "New Chat",
 
@@ -106,6 +102,8 @@ function Dashboard() {
 
     });
 
+  const [chatActivities, setChatActivities] = useState({});
+
 
   // ==========================================================
   // Active Conversation
@@ -114,15 +112,7 @@ function Dashboard() {
   const [activeChatId, setActiveChatId] =
     useState(() => {
 
-      if (
-        initialChats.length > 0
-      ) {
-
-        return initialChats[0].id;
-
-      }
-
-      return null;
+      return conversations[0]?.id ?? null;
 
     });
 
@@ -141,18 +131,34 @@ function Dashboard() {
   }, [settings.theme]);
 
 
+  useEffect(() => {
+    const model = settings.aiModel || "qwen2.5:3b";
+    const preloadTimer = window.setTimeout(() => {
+      const warmup = window.electronAPI?.prepareAssistantModels
+        ? window.electronAPI.prepareAssistantModels({
+            model,
+            performanceMode: settings.performanceMode || "fast",
+          })
+        : window.electronAPI?.preloadOllamaModel?.(model);
 
+      warmup?.catch((error) => {
+        console.warn("Model warm-up was skipped:", error);
+      });
+    }, 750);
+
+    return () => window.clearTimeout(preloadTimer);
+  }, [settings.aiModel, settings.performanceMode]);
 
 
   // ==========================================================
   // Create New Chat
   // ==========================================================
 
-  function createNewChat() {
+  const createNewChat = useCallback(() => {
 
     const newChat = {
 
-      id: Date.now(),
+      id: `chat-${window.crypto.randomUUID()}`,
 
       title: "New Chat",
 
@@ -163,15 +169,11 @@ function Dashboard() {
     };
 
 
-    const updatedChats = [
-      ...conversations,
-      newChat,
-    ];
-
-
-    setConversations(
-      updatedChats
-    );
+    setConversations((currentConversations) => {
+      const updatedChats = [...currentConversations, newChat];
+      saveConversations(updatedChats);
+      return updatedChats;
+    });
 
 
     setActiveChatId(
@@ -179,16 +181,23 @@ function Dashboard() {
     );
 
 
-    saveConversations(
-      updatedChats
-    );
-
-
     setCurrentPage(
       "chat"
     );
 
-  }
+  }, [settings]);
+
+  useEffect(() => {
+    const handleShortcut = (event) => {
+      if (event.ctrlKey && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        createNewChat();
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [createNewChat]);
 
 
   // ==========================================================
@@ -208,14 +217,15 @@ function Dashboard() {
   // Update Messages
   // ==========================================================
 
-  function updateMessages(messages) {
+  function updateMessages(chatId, messages) {
 
-    const updatedChats =
-      conversations.map(
+    setConversations((currentConversations) => {
+      const updatedChats =
+      currentConversations.map(
         (chat) => {
 
           if (
-            chat.id !== activeChatId
+            chat.id !== chatId
           ) {
 
             return chat;
@@ -257,6 +267,7 @@ function Dashboard() {
             ...chat,
 
             title,
+            updatedAt: Date.now(),
 
             messages,
 
@@ -265,16 +276,39 @@ function Dashboard() {
         }
       );
 
+      saveConversations(updatedChats);
+      return updatedChats;
+    });
 
-    setConversations(
-      updatedChats
-    );
+  }
 
 
-    saveConversations(
-      updatedChats
-    );
+  function updateChatActivity(chatId, nextActivity) {
+    setChatActivities((currentActivities) => {
+      const currentActivity = currentActivities[chatId] || {
+        loading: false,
+        generating: false,
+        streamingText: "",
+        requestId: null,
+      };
+      const updatedActivity = typeof nextActivity === "function"
+        ? nextActivity(currentActivity)
+        : { ...currentActivity, ...nextActivity };
 
+      return {
+        ...currentActivities,
+        [chatId]: updatedActivity,
+      };
+    });
+  }
+
+
+  function removeChatActivity(chatId) {
+    setChatActivities((currentActivities) => {
+      const updatedActivities = { ...currentActivities };
+      delete updatedActivities[chatId];
+      return updatedActivities;
+    });
   }
 
 
@@ -284,69 +318,58 @@ function Dashboard() {
 
   function deleteChat(id) {
 
-    const updatedChats =
-      conversations.filter(
-        (chat) =>
-          chat.id !== id
-      );
+    const activeRequestId = chatActivities[id]?.requestId;
+    if (activeRequestId) void cancelMessage(activeRequestId);
+    removeChatActivity(id);
+
+    setConversations((currentConversations) => {
+      let updatedChats = currentConversations.filter((chat) => chat.id !== id);
+
+      if (updatedChats.length === 0) {
+        updatedChats = [{
+          id: `chat-${window.crypto.randomUUID()}`,
+          title: "New Chat",
+          messages: [createWelcomeMessage(settings)],
+        }];
+      }
+
+      if (activeChatId === id) setActiveChatId(updatedChats[0].id);
+      saveConversations(updatedChats);
+      return updatedChats;
+    });
+
+  }
 
 
-    if (
-      updatedChats.length === 0
-    ) {
+  function renameChat(id, nextTitle) {
+    const title = String(nextTitle || "").trim().slice(0, 100);
+    if (!title) return false;
 
-      const firstChat = {
-
-        id: Date.now(),
-
-        title: "New Chat",
-
-        messages: [
-          createWelcomeMessage(settings)
-        ],
-
-      };
+    setConversations((currentConversations) => {
+      const updatedChats = currentConversations.map((chat) => (
+        chat.id === id ? { ...chat, title } : chat
+      ));
+      saveConversations(updatedChats);
+      return updatedChats;
+    });
+    return true;
+  }
 
 
-      setConversations([
-        firstChat
-      ]);
+  function togglePinChat(id) {
+    setConversations((currentConversations) => {
+      const updatedChats = currentConversations.map((chat) => (
+        chat.id === id ? { ...chat, pinned: !chat.pinned } : chat
+      ));
+      saveConversations(updatedChats);
+      return updatedChats;
+    });
+  }
 
 
-      setActiveChatId(
-        firstChat.id
-      );
-
-
-      saveConversations([
-        firstChat
-      ]);
-
-
-      setCurrentPage("chat");
-
-      return;
-
-    }
-
-
-    setConversations(
-      updatedChats
-    );
-
-
-    setActiveChatId(
-      updatedChats[0].id
-    );
-
-
-    saveConversations(
-      updatedChats
-    );
-
-
-    setCurrentPage("chat");
-
+  function exportSingleChat(id) {
+    const conversation = conversations.find((chat) => chat.id === id);
+    if (conversation) exportConversation(conversation);
   }
 
 
@@ -356,14 +379,14 @@ function Dashboard() {
 
   function clearAllChats() {
 
-    console.log(
-      "Dashboard function called"
-    );
-
+    Object.values(chatActivities).forEach((activity) => {
+      if (activity.requestId) void cancelMessage(activity.requestId);
+    });
+    setChatActivities({});
 
     const firstChat = {
 
-      id: Date.now(),
+      id: `chat-${window.crypto.randomUUID()}`,
 
       title: "New Chat",
 
@@ -391,6 +414,26 @@ function Dashboard() {
 
     setCurrentPage("chat");
 
+  }
+
+
+  function logout() {
+
+    Object.values(chatActivities).forEach((activity) => {
+      if (activity.requestId) void cancelMessage(activity.requestId);
+    });
+    setChatActivities({});
+
+    resetSettings();
+    navigate("/setup", { replace: true });
+
+  }
+
+  function replaceImportedChats(importedChats) {
+    if (!Array.isArray(importedChats) || importedChats.length === 0) return;
+    setConversations(importedChats);
+    setActiveChatId(importedChats[0].id);
+    setCurrentPage("chat");
   }
 
 
@@ -431,6 +474,16 @@ function Dashboard() {
 
         onDeleteChat={deleteChat}
 
+        onRenameChat={renameChat}
+
+        onTogglePin={togglePinChat}
+
+        onExportChat={exportSingleChat}
+
+        chatActivities={chatActivities}
+
+        onLogout={logout}
+
       />
 
 
@@ -446,7 +499,9 @@ function Dashboard() {
     <Chat
       key={activeChatId}
       conversation={activeConversation}
-      updateMessages={updateMessages}
+      updateMessages={(messages) => updateMessages(activeChatId, messages)}
+      activity={chatActivities[activeChatId]}
+      updateActivity={(nextActivity) => updateChatActivity(activeChatId, nextActivity)}
       settings={settings}
     />
 
@@ -472,17 +527,25 @@ function Dashboard() {
 
           <Setting
 
+            onThemeChange={
+              (theme) => {
+
+                setSettings((currentSettings) => ({
+
+                  ...currentSettings,
+
+                  theme,
+
+                }));
+
+              }
+            }
+
             onSettingsSaved={
               (updatedSettings) => {
 
                 setSettings(
                   updatedSettings
-                );
-
-
-                document.body.setAttribute(
-                  "data-theme",
-                  updatedSettings.theme
                 );
 
               }
@@ -504,6 +567,12 @@ function Dashboard() {
             onClearChats={
               clearAllChats
             }
+
+            onSettingsChanged={
+              setSettings
+            }
+
+            onConversationsImported={replaceImportedChats}
 
           />
 

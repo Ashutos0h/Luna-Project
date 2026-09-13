@@ -1,14 +1,15 @@
 import { useState } from "react";
 import "../styles/Privacy.css";
 import { clearMemory } from "../services/memoryStorage";
-import { resetSettings } from "../services/settingsStorage";
+import { loadSettings, resetSettings, saveSettings } from "../services/settingsStorage";
 import { clearConversations, exportConversations, importConversations } from "../services/chatStorage";
 import { useNavigate } from "react-router-dom";
 
-function Privacy({ onClearChats }) {
+function Privacy({ onClearChats, onSettingsChanged, onConversationsImported }) {
 
   const [notification, setNotification] = useState("");
   const [confirmModal, setConfirmModal] = useState(null);
+  const [autoMemory, setAutoMemory] = useState(() => loadSettings().autoMemory !== false);
   const navigate = useNavigate();
 
   function showNotification(msg) {
@@ -49,6 +50,7 @@ function Privacy({ onClearChats }) {
 
     if (actionType === "chats") {
       onClearChats();
+      showNotification("All conversations have been cleared.");
     } else if (actionType === "memories") {
       clearMemory();
       showNotification("All memories have been cleared.");
@@ -70,14 +72,32 @@ function Privacy({ onClearChats }) {
     if (!file) return;
 
     try {
-      await importConversations(file);
+      const importedChats = await importConversations(file);
+      onConversationsImported?.(importedChats);
       showNotification("Conversations imported successfully.");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch {
-      showNotification("Invalid JSON file.");
+    } catch (error) {
+      showNotification(error.message || "The conversation backup could not be imported.");
+    } finally {
+      event.target.value = "";
     }
+  }
+
+  function handleAutoMemoryChange(event) {
+    const enabled = event.target.checked;
+    const updatedSettings = {
+      ...loadSettings(),
+      autoMemory: enabled,
+    };
+
+    if (!saveSettings(updatedSettings)) {
+      showNotification("The privacy setting could not be saved.");
+      return;
+    }
+    setAutoMemory(enabled);
+    onSettingsChanged?.(updatedSettings);
+    showNotification(enabled
+      ? "Automatic memory is enabled."
+      : "Automatic memory is disabled.");
   }
 
   return (
@@ -121,6 +141,28 @@ function Privacy({ onClearChats }) {
         Luna is designed to protect your privacy.
         All your information remains on your device.
       </p>
+
+      <div className="privacy-card">
+
+        <div className="privacy-control-row">
+          <div>
+            <h2>Automatic Memory</h2>
+            <p>
+              Allow Luna to save stable, useful and non-sensitive details that improve future replies.
+            </p>
+          </div>
+          <label className="privacy-switch">
+            <input
+              type="checkbox"
+              checked={autoMemory}
+              onChange={handleAutoMemoryChange}
+              aria-label="Allow automatic memory"
+            />
+            <span aria-hidden="true" />
+          </label>
+        </div>
+
+      </div>
 
       <div className="privacy-card">
 
