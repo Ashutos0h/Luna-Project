@@ -140,6 +140,10 @@ export async function executeIntentActions(actions, onProgress, { desktopControl
           continue;
         }
 
+        if (action.delayMs && action.delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, action.delayMs));
+        }
+
         const result = await window.electronAPI.runDesktopControl("click_element", {
           name: action.element,
           element_type: action.elementType || undefined,
@@ -169,6 +173,64 @@ export async function executeIntentActions(actions, onProgress, { desktopControl
           action.type,
           Boolean(result?.success),
           result?.message || "Luna could not type in the focused desktop application.",
+          { cancelled: Boolean(result?.cancelled) }
+        ));
+        continue;
+      }
+
+      if (action.type === "uacc_hotkey") {
+        if (!window.electronAPI?.runDesktopControl) {
+          results.push(createActionResult(action.type, false, "Advanced desktop control is available only in the Luna desktop application."));
+          continue;
+        }
+
+        const result = await window.electronAPI.runDesktopControl("hotkey", {
+          keys: action.keys,
+          reasoning: `The user asked to press ${action.keys.join(" + ")}.`,
+        });
+        results.push(createActionResult(
+          action.type,
+          Boolean(result?.success),
+          result?.message || `Luna could not press ${action.keys.join(" + ")}.`,
+          { cancelled: Boolean(result?.cancelled) }
+        ));
+        continue;
+      }
+
+      if (action.type === "uacc_scroll") {
+        if (!window.electronAPI?.runDesktopControl) {
+          results.push(createActionResult(action.type, false, "Advanced desktop control is available only in the Luna desktop application."));
+          continue;
+        }
+
+        const result = await window.electronAPI.runDesktopControl("scroll", {
+          direction: action.direction || "down",
+          amount: action.amount || 3,
+          reasoning: `The user asked to scroll ${action.direction || "down"}.`,
+        });
+        results.push(createActionResult(
+          action.type,
+          Boolean(result?.success),
+          result?.message || `Luna could not scroll ${action.direction || "down"}.`,
+          { cancelled: Boolean(result?.cancelled) }
+        ));
+        continue;
+      }
+
+      if (action.type === "uacc_focus_window") {
+        if (!window.electronAPI?.runDesktopControl) {
+          results.push(createActionResult(action.type, false, "Advanced desktop control is available only in the Luna desktop application."));
+          continue;
+        }
+
+        const result = await window.electronAPI.runDesktopControl("focus_window", {
+          title: action.title,
+          reasoning: `The user asked to focus/switch to ${action.title}.`,
+        });
+        results.push(createActionResult(
+          action.type,
+          Boolean(result?.success),
+          result?.message || `Luna could not focus "${action.title}".`,
           { cancelled: Boolean(result?.cancelled) }
         ));
         continue;

@@ -37,3 +37,28 @@ test("summarizes user-visible confirmations without exposing full typed text", (
   assert.match(summary, /^Type /);
   assert.ok(summary.length < 90);
 });
+
+test("validates smart_click, special hotkeys, and scroll", () => {
+  // smart_click validation
+  assert.equal(validateUaccInvocation("smart_click", { description: "Subscribe button" }).valid, true);
+  assert.equal(validateUaccInvocation("smart_click", { description: "" }).valid, false);
+
+  // hotkeys with special keys (enter, escape, f5, ctrl+s)
+  assert.equal(validateUaccInvocation("hotkey", { keys: ["ctrl", "s"] }).valid, true);
+  assert.equal(validateUaccInvocation("hotkey", { keys: ["enter"] }).valid, true);
+  assert.equal(validateUaccInvocation("hotkey", { keys: ["escape"] }).valid, true);
+  assert.equal(validateUaccInvocation("hotkey", { keys: ["f5"] }).valid, true);
+  assert.equal(validateUaccInvocation("hotkey", { keys: ["invalid_key_name_that_is_too_long"] }).valid, false);
+
+  // scroll validation
+  assert.equal(validateUaccInvocation("scroll", { direction: "down" }).valid, true);
+  assert.equal(validateUaccInvocation("scroll", { direction: "up" }).valid, true);
+  assert.equal(validateUaccInvocation("scroll", { direction: "sideways" }).valid, false);
+
+  // action summaries
+  assert.equal(summarizeUaccAction("smart_click", { description: "Subscribe" }), 'Click "Subscribe" (visual match)');
+  assert.equal(summarizeUaccAction("hotkey", { keys: ["ctrl", "s"] }), "Press ctrl + s");
+  assert.equal(summarizeUaccAction("scroll", { direction: "down", amount: 5 }), "Scroll down (5×)");
+  assert.equal(summarizeUaccAction("focus_window", { title: "Chrome" }), "Focus window: Chrome");
+});
+

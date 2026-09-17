@@ -73,6 +73,10 @@ function Chat({
   activity,
   updateActivity,
   settings,
+  onTogglePin,
+  onRenameChat,
+  onExportChat,
+  onDeleteChat,
 }) {
 
   const messages = useMemo(
@@ -99,6 +103,9 @@ function Chat({
 
   const [documentError, setDocumentError] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [renameText, setRenameText] = useState("");
   const isFreshConversation = !messages.some((message) => message.sender === "user");
 
 
@@ -106,9 +113,57 @@ function Chat({
     useRef(null);
 
   const messagesContainerRef = useRef(null);
+  const headerMenuRef = useRef(null);
+  const headerRenameInputRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const pendingStreamTextRef = useRef("");
   const streamFlushTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!headerMenuOpen) return undefined;
+
+    const handleClickOutside = (event) => {
+      try {
+        if (
+          headerMenuRef.current &&
+          event.target &&
+          typeof headerMenuRef.current.contains === "function" &&
+          !headerMenuRef.current.contains(event.target)
+        ) {
+          setHeaderMenuOpen(false);
+        }
+      } catch (err) {
+        console.warn("Click outside check failed:", err);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setHeaderMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [headerMenuOpen]);
+
+  useEffect(() => {
+    if (editingTitle && headerRenameInputRef.current) {
+      headerRenameInputRef.current.focus();
+      headerRenameInputRef.current.select();
+    }
+  }, [editingTitle]);
+
+  function submitHeaderRename(e) {
+    if (e) e.preventDefault();
+    const clean = String(renameText || "").trim();
+    if (clean && clean !== conversation.title) {
+      onRenameChat?.(conversation.id, clean);
+    }
+    setEditingTitle(false);
+  }
 
   useEffect(() => () => {
     if (streamFlushTimerRef.current) {
@@ -122,6 +177,8 @@ function Chat({
 
     // Ollama can emit many tiny chunks per second. Updating React for every
     // token makes rich chat messages feel slower even when the model is fast.
+    // 16ms = one animation frame at 60fps. Flushing every frame gives the
+    // smoothest token-by-token streaming without overwhelming React's scheduler.
     streamFlushTimerRef.current = window.setTimeout(() => {
       const bufferedText = pendingStreamTextRef.current;
       pendingStreamTextRef.current = "";
@@ -133,7 +190,7 @@ function Chat({
           ? { ...current, streamingText: current.streamingText + bufferedText }
           : current
       ));
-    }, 40);
+    }, 16);
   }
 
 
@@ -247,7 +304,7 @@ ${document.content}
 
       const executableActions = (response.actions || []).map((action) => (
         action.type === "generate_and_type"
-          ? { ...action, text: response.text }
+          ? { ...action, text: String(action.text || response.text || "").trim() }
           : action
       ));
       const actionResults = await executeIntentActions(executableActions, (action) => {
@@ -260,8 +317,11 @@ ${document.content}
           search_web: "Opening web search…",
           open_url: "Opening website…",
           open_folder: "Opening folder…",
-          uacc_click_element: `Preparing to click ${action.element}…`,
-          uacc_type_text: "Preparing desktop typing…",
+          uacc_click_element: `Locating "${action.element}" on screen…`,
+          uacc_type_text: "Typing in active window…",
+          uacc_hotkey: `Pressing ${(action.keys || []).join(" + ")}…`,
+          uacc_scroll: `Scrolling ${action.direction || "down"}…`,
+          uacc_focus_window: `Switching to ${action.title}…`,
           save_memory: "Saving memory…",
         };
         updateActivity((current) => current.requestId === requestId
@@ -278,7 +338,10 @@ ${document.content}
         result.type === "open_url" ||
         result.type === "open_folder" ||
         result.type === "uacc_click_element" ||
-        result.type === "uacc_type_text"
+        result.type === "uacc_type_text" ||
+        result.type === "uacc_hotkey" ||
+        result.type === "uacc_scroll" ||
+        result.type === "uacc_focus_window"
       ));
       const memoryResults = actionResults.filter((result) => result.type === "save_memory");
 
@@ -493,8 +556,145 @@ ${document.content}
 
       <div className="chat-header">
         <div className="chat-heading">
-          <h2>{isFreshConversation ? `Chat with ${settings?.assistantName || "Luna"}` : conversation.title}</h2>
+          {editingTitle ? (
+            <form className="chat-header-rename" onSubmit={submitHeaderRename}>
+              <input
+                ref={headerRenameInputRef}
+                type="text"
+                value={renameText}
+                onChange={(e) => setRenameText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setEditingTitle(false);
+                }}
+                onBlur={submitHeaderRename}
+                maxLength={60}
+                aria-label="Rename conversation"
+                autoFocus
+              />
+              <button type="submit" className="rename-confirm-btn" title="Save title" aria-label="Save title">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+              <button type="button" className="rename-cancel-btn" onClick={() => setEditingTitle(false)} title="Cancel" aria-label="Cancel">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </form>
+          ) : (
+            <h2>
+              {conversation.pinned && (
+                <span className="chat-pinned-icon" title="Pinned conversation" aria-label="Pinned">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="17" x2="12" y2="22" />
+                    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z" />
+                  </svg>
+                </span>
+              )}
+              <span className="chat-heading-text" title={conversation.title}>
+                {isFreshConversation ? `Chat with ${settings?.assistantName || "Luna"}` : conversation.title}
+              </span>
+            </h2>
+          )}
         </div>
+
+        {!isFreshConversation && (
+          <div className="chat-header-actions" ref={headerMenuRef}>
+            <button
+              type="button"
+              className={`chat-header-menu-btn${headerMenuOpen ? " active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setHeaderMenuOpen((prev) => !prev);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label="Conversation actions"
+              title="Conversation actions"
+              aria-expanded={headerMenuOpen}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.8" />
+                <circle cx="12" cy="12" r="1.8" />
+                <circle cx="12" cy="19" r="1.8" />
+              </svg>
+            </button>
+
+            {headerMenuOpen && (
+              <div
+                className="chat-header-menu"
+                role="menu"
+                aria-label="Conversation actions"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    if (conversation?.id) onTogglePin?.(conversation.id);
+                  }}
+                  role="menuitem"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="17" x2="12" y2="22" />
+                    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24Z" />
+                  </svg>
+                  <span>{conversation?.pinned ? "Unpin conversation" : "Pin conversation"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    setRenameText(conversation?.title || "");
+                    setEditingTitle(true);
+                  }}
+                  role="menuitem"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m16.5 3.5 4 4L7 19l-4 1 1-4z" />
+                  </svg>
+                  <span>Rename</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    if (conversation?.id) onExportChat?.(conversation.id);
+                  }}
+                  role="menuitem"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>Export JSON</span>
+                </button>
+
+                <div className="chat-header-menu-divider" />
+
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => {
+                    setHeaderMenuOpen(false);
+                    if (conversation?.id) onDeleteChat?.(conversation.id);
+                  }}
+                  role="menuitem"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  <span>Delete conversation</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
 

@@ -48,6 +48,29 @@ export function findUaccPython() {
   }) || null;
 }
 
+function cleanErrorMessage(raw, fallback) {
+  if (!raw || typeof raw !== "string") return fallback;
+  const str = raw.trim();
+  // Strip Python tracebacks
+  if (str.includes("Traceback (most recent call last):")) {
+    const lines = str.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const last = lines.at(-1);
+    if (last) return last.replace(/^[A-Za-z0-9_.]+(?:Error|Exception):\s*/i, "").trim() || fallback;
+  }
+  // Strip JSON formatting if accidentally passed
+  if (str.startsWith("{") && str.endsWith("}")) {
+    try {
+      const obj = JSON.parse(str);
+      const msg = obj.message || obj.error || obj.detail || obj.reason;
+      if (msg && typeof msg === "string") return cleanErrorMessage(msg, fallback);
+    } catch {
+      // not json
+    }
+    return fallback;
+  }
+  return str.slice(0, 300);
+}
+
 function compactResult(result) {
   const text = (result?.content || [])
     .filter((item) => item?.type === "text")
@@ -70,14 +93,35 @@ function compactResult(result) {
     : (typeof structured?.ok === "boolean"
       ? structured.ok
       : (["error", "failed", "failure"].includes(String(structured?.status || "").toLowerCase()) ? false : null));
-  const reportedMessage = [structured?.message, structured?.error, structured?.detail, structured?.reason]
+  const isSuccess = !result?.isError && reportedSuccess !== false;
+
+  const rawMsg = [structured?.message, structured?.error, structured?.detail, structured?.reason]
     .map((value) => typeof value === "string" ? value : "")
     .find((value) => value.trim());
 
+  let userMessage;
+  if (rawMsg) {
+    userMessage = cleanErrorMessage(rawMsg, isSuccess ? "Desktop action completed." : "UACC could not complete the desktop action.");
+  } else if (isSuccess) {
+    userMessage = "Desktop action completed successfully.";
+  } else {
+    // Failure without a clear message: inspect text for common failure signals
+    const lower = text.toLowerCase();
+    if (lower.includes("not found") || lower.includes("element")) {
+      userMessage = "Could not locate that element on screen. Make sure the window is visible.";
+    } else if (lower.includes("window") || lower.includes("process")) {
+      userMessage = "Could not find an open window for that application.";
+    } else if (lower.includes("timeout") || lower.includes("timed out")) {
+      userMessage = "The desktop action timed out. Please try again.";
+    } else {
+      userMessage = "UACC could not complete the desktop action.";
+    }
+  }
+
   return {
-    success: !result?.isError && reportedSuccess !== false,
+    success: isSuccess,
     text: text.slice(0, RESULT_TEXT_LIMIT),
-    message: reportedMessage || text.slice(0, RESULT_TEXT_LIMIT),
+    message: userMessage,
     truncated: text.length > RESULT_TEXT_LIMIT,
   };
 }
@@ -94,7 +138,7 @@ async function createConnection() {
     command: python,
     args: ["-m", "uacc.mcp"],
     stderr: "pipe",
-    env: { ...process.env, PYTHONUTF8: "1" },
+    env: { ...process.env, PYTHONUTF8: "1", UACC_FAILSAFE: "false" },
   });
   transport.stderr?.on("data", (chunk) => {
     stderr = `${stderr}${String(chunk || "")}`.slice(-2000);
@@ -213,7 +257,11 @@ export async function callUaccReadOnlyTool(toolName, args = {}) {
     const result = await activeConnection.client.callTool({ name: toolName, arguments: args });
     return compactResult(result);
   } catch (error) {
-    return { success: false, text: `UACC inspection failed: ${error.message}` };
+    const raw = error.message || "";
+    if (raw.includes("-32001") || raw.toLowerCase().includes("timed out")) {
+      return { success: false, text: "Desktop inspection timed out. Please try again." };
+    }
+    return { success: false, text: `Desktop inspection failed: ${cleanErrorMessage(raw, "Could not inspect desktop.")}` };
   }
 }
 
@@ -234,7 +282,11 @@ export async function callUaccControlTool(toolName, args = {}) {
       truncated: compact.truncated,
     };
   } catch (error) {
-    return { success: false, message: `UACC action failed: ${error.message}` };
+    const raw = error.message || "";
+    if (raw.includes("-32001") || raw.toLowerCase().includes("timed out")) {
+      return { success: false, message: "Desktop action timed out. Make sure the application is open and visible, then try again." };
+    }
+    return { success: false, message: cleanErrorMessage(raw, "Desktop action could not be completed.") };
   }
 }
 

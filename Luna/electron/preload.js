@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld(
         data
       ),
 
+    generateChatTitle: (data) =>
+      ipcRenderer.invoke(
+        "generate-chat-title",
+        data
+      ),
+
     cancelChatRequest: (requestId) =>
       ipcRenderer.invoke(
         "cancel-chat-request",

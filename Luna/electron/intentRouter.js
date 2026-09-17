@@ -12,6 +12,9 @@ DECISION POLICY:
 - search_in_application: only when Advanced desktop control is enabled and the user explicitly asks to search for a query inside a named application or platform.
 - click_desktop_element: only when Advanced desktop control is enabled and the user explicitly asks to click a visible, named element in the currently open application.
 - type_into_active_application: only when Advanced desktop control is enabled and the user explicitly asks to type exact supplied text into the currently focused application.
+- press_hotkey: only when Advanced desktop control is enabled and the user asks to press a keyboard shortcut like Ctrl+S, Ctrl+Z, F5, Enter, Escape, Alt+Tab, etc.
+- scroll_desktop: only when Advanced desktop control is enabled and the user asks to scroll up, scroll down, scroll to top, page down, etc.
+- focus_application_window: only when Advanced desktop control is enabled and the user asks to switch to, focus, or bring up a specific named application window.
 - save_memory: when the current message's main purpose is to remember a stable, useful, non-sensitive user fact.
 - respond_normally: explanations, writing, coding, advice, troubleshooting, memory recall, and all other ordinary conversation.
 
@@ -21,9 +24,15 @@ IMPORTANT BOUNDARIES:
 - "What did I tell you about my project?" is respond_normally and must never create a new memory.
 - "Open Notepad and write hello" is open_application_and_type with text exactly "hello".
 - "Write a short story about space in Notepad" is generate_content_and_type. Generate the content immediately and paste it into the application.
+- If the user already received generated content and then says "save", "put it in Notepad", or "it is not saved yet", treat that as generate_content_and_type / typing into the same application. Never claim the file was saved unless a desktop action actually ran.
 - "Search lo-fi music on YouTube" is search_in_application with application "YouTube" and query "lo-fi music".
 - "Click the Save button" is click_desktop_element with element "Save" only when desktop control is enabled.
+- "Click Subscribe on YouTube" is click_desktop_element with element "Subscribe" only when desktop control is enabled.
 - "Type hello in the active window" is type_into_active_application with text exactly "hello" only when desktop control is enabled.
+- "Press Ctrl+S" or "save with keyboard shortcut" is press_hotkey with keys ["ctrl","s"] only when desktop control is enabled.
+- "Press Enter" is press_hotkey with keys ["enter"] only when desktop control is enabled.
+- "Scroll down" or "scroll the page down" is scroll_desktop with direction "down" only when desktop control is enabled.
+- "Switch to Chrome" or "focus Chrome" is focus_application_window with title "Chrome" only when desktop control is enabled.
 - For a mixed message such as "I prefer short answers; explain recursion", use respond_normally and include memory_title/memory_value for the asserted preference.
 - A question, request, guess, temporary detail, secret, or fact about somebody else is not a memory.
 - If uncertain, use respond_normally.`;
@@ -166,12 +175,12 @@ const advancedDesktopControlTools = [
     type: "function",
     function: {
       name: "click_desktop_element",
-      description: "Click one named, visible element in the currently open application using local accessibility matching. Use only when the user explicitly asks to click/select a visible button, menu item, checkbox, or link. Luna will always ask for confirmation before clicking.",
+      description: "Click one named, visible element in the currently open application using accessibility matching. Falls back to visual AI matching automatically. Use only when the user explicitly asks to click/select a visible button, menu item, checkbox, or link.",
       parameters: {
         type: "object",
         required: ["element"],
         properties: {
-          element: { type: "string", description: "The exact visible element label, such as Save, Submit, or New tab." },
+          element: { type: "string", description: "The exact visible element label, such as Save, Subscribe, or New tab." },
           element_type: { type: "string", description: "Optional element kind, such as button, menu_item, checkbox, or link." },
         },
       },
@@ -181,12 +190,59 @@ const advancedDesktopControlTools = [
     type: "function",
     function: {
       name: "type_into_active_application",
-      description: "Type the exact user-supplied text into the currently focused application. Use only when the user explicitly asks to type/write/paste text in their active application. Luna will always ask for confirmation before typing.",
+      description: "Type the exact user-supplied text into the currently focused application. Use only when the user explicitly asks to type/write/paste text in their active application.",
       parameters: {
         type: "object",
         required: ["text"],
         properties: {
           text: { type: "string", description: "The exact text the user requested. Do not add, change, or interpret it." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "press_hotkey",
+      description: "Press a keyboard shortcut in the currently active application. Use when the user asks to press a key combination such as Ctrl+S, Ctrl+Z, F5, Enter, Escape, or Alt+Tab.",
+      parameters: {
+        type: "object",
+        required: ["keys"],
+        properties: {
+          keys: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of key names to press together, e.g. [\"ctrl\", \"s\"] or [\"f5\"] or [\"escape\"].",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "scroll_desktop",
+      description: "Scroll up or down in the currently focused application or window. Use when the user asks to scroll up, scroll down, scroll to top, etc.",
+      parameters: {
+        type: "object",
+        required: ["direction"],
+        properties: {
+          direction: { type: "string", enum: ["up", "down", "left", "right"], description: "The scroll direction." },
+          amount: { type: "number", description: "Number of scroll steps, default 3." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "focus_application_window",
+      description: "Bring a named application window to the foreground and focus it. Use when the user asks to switch to, focus, or bring up a specific application.",
+      parameters: {
+        type: "object",
+        required: ["title"],
+        properties: {
+          title: { type: "string", description: "The application or window title to focus, e.g. Chrome, Notepad, VS Code." },
         },
       },
     },
@@ -226,17 +282,18 @@ export function getNormalChatTool(allowAutoMemory) {
 // Action-like or time-sensitive requests deliberately return null so the
 // semantic Ollama router still makes the final decision. This keeps normal
 // conversation fast without going back to brittle keyword-only tool routing.
-export function routeClearlyConversationalIntent(message, allowAutoMemory) {
+export function routeClearlyConversationalIntent(message, allowAutoMemory, conversationHistory = []) {
   const text = String(message || "").trim();
   if (!text) return null;
 
+  const mentionsWritableApp = /\b(?:notepad|note\s*pad|notpad|word|excel|chrome|chrme|edge|browser|application|app)\b/i.test(text);
   const mayNeedDesktopAction =
     /\b(?:open|launch|start|search|browse|google|look\s+up|navigate|go\s+to)\b/i.test(text) ||
-    /\b(?:click|tap|select|press)\b[\s\S]{0,120}\b(?:button|menu|link|checkbox|tab|option|field|item)\b/i.test(text) ||
+    /\b(?:click|tap|select|press)\b/i.test(text) ||
     /\b(?:remember|save|store|keep)\b.{0,35}\b(?:this|that|memory|in mind|for later)\b/i.test(text) ||
-    /\b(?:type|paste|enter|write)\b.{0,80}\b(?:notepad|word|excel|chrome|browser|application|app)\b/i.test(text) ||
+    (/\b(?:generate|create|compose|draft|write|type|paste|enter|put|save)\b/i.test(text) && mentionsWritableApp) ||
     /\b(?:type|paste|enter|write)\b[\s\S]{0,100}\b(?:active|current|focused)\s+(?:window|app|application)\b/i.test(text) ||
-    /\b(?:notepad|note pad|word|excel|chrome|chrme|edge|browser|application|app)\b[\s\S]{0,160}\b(?:type|paste|enter|write)\b/i.test(text) ||
+    (isSaveGeneratedContentFollowUp(text) && previousTurnWantedGeneratedWrite(conversationHistory)) ||
     /\b(?:latest|current|today|nearby|near me|weather|news|price|schedule|best|recommended)\b/i.test(text);
 
   if (mayNeedDesktopAction) return null;
@@ -261,6 +318,12 @@ const knownLaunchableApplications = new Map([
   ["paint", "Paint"], ["file explorer", "File Explorer"], ["explorer", "File Explorer"],
   ["word", "Word"], ["excel", "Excel"], ["powerpoint", "PowerPoint"],
   ["vs code", "VS Code"], ["vscode", "VS Code"], ["code", "VS Code"],
+  ["camera", "Camera"], ["windows camera", "Camera"],
+  ["spotify", "Spotify"], ["whatsapp", "WhatsApp"], ["discord", "Discord"],
+  ["terminal", "Terminal"], ["powershell", "PowerShell"],
+  ["task manager", "Task Manager"], ["settings", "Settings"],
+  ["photos", "Photos"],
+  ["yt", "YouTube"], ["youtube", "YouTube"],
 ]);
 
 const browserNames = new Map([
@@ -282,8 +345,77 @@ function isClearlyInstructionalRequest(text) {
   return /\?$/.test(text) || /^(?:how\s+(?:do|can|could|should|would)\s+i|how\s+to|can\s+you\s+(?:explain|tell|show)|tell\s+me\s+how)\b/i.test(text);
 }
 
+function canonicalApplicationName(rawName) {
+  const name = String(rawName || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/g, "")
+    .replace(/\s+/g, " ");
+  if (!name) return null;
+  if (knownLaunchableApplications.has(name)) return knownLaunchableApplications.get(name);
+
+  const collapsed = name.replace(/[^a-z0-9]/g, "");
+  if (collapsed.includes("notepad") || /not+e?p+ad/.test(collapsed)) return "Notepad";
+
+  const tokens = name.split(" ").filter(Boolean);
+  for (let count = Math.min(3, tokens.length); count >= 1; count--) {
+    const slice = tokens.slice(-count).join(" ");
+    if (knownLaunchableApplications.has(slice)) return knownLaunchableApplications.get(slice);
+  }
+  return null;
+}
+
+function extractDestinationApplication(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+
+  const prepMatch = normalized.match(/\b(?:in|into|to|on)\s+([a-z0-9][a-z0-9 ._-]{1,80})$/i);
+  if (prepMatch) {
+    const application = canonicalApplicationName(prepMatch[1]);
+    if (application) return application;
+  }
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  for (let count = Math.min(4, tokens.length); count >= 1; count--) {
+    const application = canonicalApplicationName(tokens.slice(-count).join(" "));
+    if (application) return application;
+  }
+  return null;
+}
+
+function isSaveGeneratedContentFollowUp(text) {
+  const normalized = String(text || "").trim().toLowerCase();
+  return /^(?:please\s+)?(?:save(?:\s+it)?(?:\s+(?:in|into|to)\s+[\w ._-]+)?|put\s+it(?:\s+(?:in|into|to)\s+[\w ._-]+)?|write\s+it(?:\s+(?:in|into|to)\s+[\w ._-]+)?|paste\s+it(?:\s+(?:in|into|to)\s+[\w ._-]+)?|store\s+it(?:\s+(?:in|into|to)\s+[\w ._-]+)?)[.!?]?$/.test(normalized)
+    || /^(?:it|id|it's|its)\s+is\s+not\s+saved(?:\s+yet)?[.!?]?$/.test(normalized)
+    || /^(?:y+e+s+|y+e+a+h*|y+e+p|s+u+r+e|o+k+a*y*|p+l+e+a+s+e|d+o\s+i+t|g+o\s+a+h+e+a+d)[.!?]*$/i.test(normalized);
+}
+
+function previousTurnWantedGeneratedWrite(history) {
+  const reversed = [...(Array.isArray(history) ? history : [])].reverse();
+  const lastAssistant = reversed.find((entry) => entry?.role === "assistant");
+  if (/\b(?:save|store|paste|put|write)\b.{0,60}\b(?:notepad|application|file|document)\b/i.test(String(lastAssistant?.content || ""))) {
+    return true;
+  }
+  const lastUser = reversed.find((entry) => entry?.role === "user");
+  return Boolean(routeGeneratedWriteCommand(String(lastUser?.content || "")))
+    || (/\b(?:generate|write|compose|story|poem)\b/i.test(String(lastUser?.content || "")) && /\b(?:notepad|calc|word|editor)\b/i.test(String(lastUser?.content || "")));
+}
+
+function pasteableAssistantText(history) {
+  const lastAssistant = [...(Array.isArray(history) ? history : [])].reverse().find((entry) => entry?.role === "assistant");
+  const cleaned = String(lastAssistant?.content || "")
+    .replace(/^of course[^\n]*\n+/i, "")
+    .replace(/^sure,?\s+here['’]?s[^\n]*:\s*/i, "")
+    .replace(/^here['’]?s\s+[^\n]*:\s*/i, "")
+    .replace(/\n+would you like[\s\S]*$/i, "")
+    .trim();
+  if (!cleaned || cleaned.length < 20) return "";
+  if (/^\*[^*]+\*$/.test(cleaned) && cleaned.length < 240) return "";
+  return cleaned.slice(0, 4000);
+}
+
 function generatedWriteAction(application, contentRequest) {
-  const canonicalApplication = knownLaunchableApplications.get(String(application || "").trim().toLowerCase());
+  const canonicalApplication = canonicalApplicationName(application);
   const request = cleanExplicitQuery(contentRequest);
   if (!canonicalApplication || !request) return null;
   return {
@@ -296,26 +428,67 @@ function generatedWriteAction(application, contentRequest) {
   };
 }
 
-export function routeExplicitDesktopCommand(message) {
+function routeGeneratedWriteCommand(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  if (!normalized || /\b(?:do not|don't|dont|never)\b/i.test(normalized)) return null;
+
+  const stripped = normalized.replace(/^(?:hey\s+|hi\s+|hello\s+)?(?:can\s+you\s+(?:help\s+me\s+(?:with\s+|to\s+)?)?|could\s+you\s+(?:please\s+)?|please\s+|help\s+me\s+(?:to\s+|with\s+)?|i\s+want\s+you\s+to\s+|would\s+you\s+)/i, "").trim();
+
+  if (!/^(?:please\s+)?(?:generate|create|compose|draft|write|make)\b/i.test(stripped)) return null;
+
+  const application = extractDestinationApplication(normalized) || extractDestinationApplication(stripped);
+  if (!application) return null;
+
+  const hasDestinationCue = /\b(?:in|into|to)\s+\S+/i.test(normalized)
+    || /\b(?:and|then)\s+(?:write|paste|put|save|store)\b/i.test(normalized)
+    || /\b(?:put|paste|save|store)\b/i.test(normalized);
+  if (!hasDestinationCue) return null;
+
+  const contentRequest = stripped
+    .replace(/^(?:please\s+)?(?:generate|create|compose|draft|write|make)\s+/i, "")
+    .replace(/\s+(?:and|then)\s+(?:write|paste|put|save|store)\b[\s\S]*$/i, "")
+    .replace(/\s+(?:in|into|to)\s+[a-z0-9 ._-]{2,120}\s*[.!?]?$/i, "")
+    .trim();
+  return generatedWriteAction(application, contentRequest || "the requested content");
+}
+
+function routePendingGeneratedWriteFollowUp(message, conversationHistory) {
+  if (!isSaveGeneratedContentFollowUp(message) || !previousTurnWantedGeneratedWrite(conversationHistory)) {
+    return null;
+  }
+
+  const application = extractDestinationApplication(message)
+    || extractDestinationApplication(
+      [...(Array.isArray(conversationHistory) ? conversationHistory : [])]
+        .reverse()
+        .find((entry) => entry?.role === "user")?.content
+    )
+    || "Notepad";
+  const existingText = pasteableAssistantText(conversationHistory);
+  if (existingText) {
+    return {
+      intent: "open_app_and_type",
+      actions: [{ type: "open_app_and_type", application, text: existingText }],
+    };
+  }
+  return generatedWriteAction(application, "the previously requested content");
+}
+
+export function routeExplicitDesktopCommand(message, conversationHistory = [], desktopControlEnabled = false) {
   const text = String(message || "").trim();
   if (!text || text.length > 1200 || isClearlyInstructionalRequest(text)) return null;
   if (/\b(?:do not|don't|dont|never)\s+(?:open|launch|start|search|browse|google)\b/i.test(text)) return null;
 
+  const pendingWrite = routePendingGeneratedWriteFollowUp(text, conversationHistory);
+  if (pendingWrite) return pendingWrite;
+
   // Generate-first composition requests cannot use open_app_and_type because
   // that action only accepts text the user already supplied. This route keeps
   // the generation and the later, confirmation-gated paste as one workflow.
-  const generateThenWrite = /^(?:please\s+)?(?:generate|create|compose|draft|write)\s+(.+?)\s+(?:and|then)\s+(?:write|paste|put|save)\s+(?:it\s+)?(?:in|into|to)\s+([a-z0-9 ._-]{2,120})\s*[.!]?$/i;
-  const generateInApplication = /^(?:please\s+)?(?:generate|create|compose|draft|write)\s+(.+?)\s+(?:in|into|to)\s+([a-z0-9 ._-]{2,120})\s*[.!]?$/i;
-  let match = text.match(generateThenWrite);
-  if (match) {
-    const route = generatedWriteAction(match[2], match[1]);
-    if (route) return route;
-  }
-  match = text.match(generateInApplication);
-  if (match) {
-    const route = generatedWriteAction(match[2], match[1]);
-    if (route) return route;
-  }
+  const generatedWrite = routeGeneratedWriteCommand(text);
+  if (generatedWrite) return generatedWrite;
+
+  let match;
 
   const browserPattern = "(?:google\\s+chrome|chrome|microsoft\\s+edge|edge|firefox|brave)";
   const openAndSearch = new RegExp(
@@ -354,8 +527,8 @@ export function routeExplicitDesktopCommand(message) {
   // Platform searches are intentionally recognized before normal chat. Known
   // web platforms use their own search URLs; all other named applications are
   // handed to the guarded UACC search runner.
-  const openTargetAndSearch = /^(?:please\s+)?(?:open|launch|start)\s+([a-z0-9 ._&+-]{2,120}?)\s+(?:and|then)\s+(?:search|google|look\s+up|browse)(?:\s+(?:for|on|in))?\s+(.+?)\s*$/i;
-  const searchInTarget = /^(?:please\s+)?(?:search|google|look\s+up|browse)(?:\s+(?:for|on))?\s+(.+?)\s+(?:on|in|using)\s+([a-z0-9 ._&+-]{2,120})\s*$/i;
+  const openTargetAndSearch = /^(?:please\s+)?(?:open|launch|start)\s+([a-z0-9 ._&+-]{2,120}?)\s+(?:and|then)\s+(?:search|google|look\s+up|browse|find|play|listen\s+to|listen|put\s+on|queue|watch|stream|stream\s+music|show)(?:\s+(?:for|on|in|me))?(?:\s+some)?\s+(.+?)\s*$/i;
+  const searchInTarget = /^(?:please\s+)?(?:search|google|look\s+up|browse|find|play|listen\s+to|listen|put\s+on|queue|watch|stream|show)(?:\s+(?:for|on|me))?(?:\s+some)?\s+(.+?)\s+(?:on|in|using|with|via)\s+([a-z0-9 ._&+-]{2,120})\s*$/i;
 
   match = text.match(openTargetAndSearch);
   if (match) {
@@ -381,6 +554,40 @@ export function routeExplicitDesktopCommand(message) {
     }
   }
 
+  // Open application and write/type text: "open notepad and write hello ashutosh"
+  const openAndTypeMatch = text.match(
+    /^(?:please\s+)?(?:open|launch|start)\s+([a-z0-9 ._-]{2,80})\s+(?:and|then)\s+(?:write|type|paste|enter|put)\s+["']?([\s\S]+?)["']?[.!?]?$/i
+  );
+  if (openAndTypeMatch) {
+    const rawApp = openAndTypeMatch[1].trim();
+    const application = canonicalApplicationName(rawApp);
+    const content = cleanExplicitQuery(openAndTypeMatch[2]);
+    if (application && content) {
+      return {
+        intent: "open_app_and_type",
+        actions: [{ type: "open_app_and_type", application, text: content }],
+      };
+    }
+  }
+
+  // Type/write text in application: "write hello ashutosh in notepad"
+  const typeInAppMatch = text.match(
+    /^(?:please\s+)?(?:write|type|paste|enter|put)\s+["']?([^"'\n\r]+?)["']?\s+(?:in|into)\s+([a-z0-9 ._-]{2,80})[.!?]?$/i
+  );
+  if (typeInAppMatch && !isClearlyInstructionalRequest(text)) {
+    const rawApp = typeInAppMatch[2].trim();
+    const content = cleanExplicitQuery(typeInAppMatch[1]);
+    if (!/\b(?:active|current|focused)\s+(?:window|app|application)\b/i.test(rawApp)) {
+      const application = canonicalApplicationName(rawApp);
+      if (application && content) {
+        return {
+          intent: "open_app_and_type",
+          actions: [{ type: "open_app_and_type", application, text: content }],
+        };
+      }
+    }
+  }
+
   match = text.match(/^(?:please\s+)?(?:open|launch|start)\s+([a-z0-9 ._-]{2,120})\s*[.!]?$/i);
   if (match) {
     const application = knownLaunchableApplications.get(match[1].trim().toLowerCase());
@@ -389,6 +596,106 @@ export function routeExplicitDesktopCommand(message) {
         intent: "open_app",
         actions: [{ type: "open_app", application }],
       };
+    }
+  }
+
+  if (desktopControlEnabled) {
+    // 1. Photo / camera capture: "click picture", "click photo", "take photo", "take picture", "capture photo"
+    if (/^(?:please\s+)?(?:click|take|capture)(?:\s+(?:a|the))?\s+(?:picture|photo|snapshot)[.!]?$/i.test(text)) {
+      return {
+        intent: "uacc_click_element",
+        actions: [{ type: "uacc_click_element", element: "Take Photo", elementType: "button" }],
+      };
+    }
+
+    // 2. Compound camera: "open camera and (click picture|take photo|take picture)"
+    if (/^(?:please\s+)?(?:open|launch|start)\s+(?:the\s+)?camera\s+(?:and|then)\s+(?:click|take|capture)(?:\s+(?:a|the))?\s+(?:picture|photo|snapshot)[.!]?$/i.test(text)) {
+      return {
+        intent: "uacc_click_element",
+        actions: [
+          { type: "open_app", application: "Camera" },
+          { type: "uacc_click_element", element: "Take Photo", elementType: "button", delayMs: 1500 },
+        ],
+      };
+    }
+
+    // 3. Keyboard hotkeys: "press Ctrl+S", "press Enter", "press Escape", "press F5", "hit Ctrl+Z"
+    const hotkeyMatch = text.match(
+      /^(?:please\s+)?(?:press|hit|use|send)\s+(?:the\s+)?(?:keyboard\s+shortcut\s+)?([a-z0-9 +]+)[.!]?$/i
+    );
+    if (hotkeyMatch) {
+      const raw = hotkeyMatch[1].trim().toLowerCase();
+      // Parse "ctrl+s", "ctrl + s", "ctrl s" all the same way
+      const keys = raw.split(/[\s+]+/).map((k) => k.trim()).filter(Boolean);
+      const KNOWN_KEY = /^([a-z]|[0-9]|f[1-9]|f1[0-2]|enter|return|escape|esc|tab|space|backspace|delete|del|home|end|pageup|pagedown|pgup|pgdn|up|down|left|right|ctrl|control|shift|alt|win|cmd|meta|plus|minus|insert)$/i;
+      if (keys.length >= 1 && keys.length <= 5 && keys.every((k) => KNOWN_KEY.test(k))) {
+        return {
+          intent: "uacc_hotkey",
+          actions: [{ type: "uacc_hotkey", keys }],
+        };
+      }
+    }
+
+    // 4. General desktop click: "click [element]", "click on [element]", "click the [element] button"
+    const clickMatch = text.match(
+      /^(?:please\s+)?(?:click|tap|press|select)(?:\s+on)?(?:\s+the)?\s+["']?([^"'\n\r.!?]+?)["']?(?:\s+(?:button|link|icon|tab|checkbox|option|control))?[.!]?$/i
+    );
+    if (clickMatch && !isClearlyInstructionalRequest(text)) {
+      const element = cleanExplicitQuery(clickMatch[1].replace(/^(?:the|a)\s+/i, ""));
+      if (element && element.length <= 120 && !/\b(?:do not|don't|dont|never)\b/i.test(element)) {
+        return {
+          intent: "uacc_click_element",
+          actions: [{ type: "uacc_click_element", element }],
+        };
+      }
+    }
+
+    // 5. Typing in active window: "type [text] in (the )?active window"
+    const typeInActiveMatch = text.match(
+      /^(?:please\s+)?(?:type|enter|paste)\s+["']?([^"'\n\r]+?)["']?\s+(?:in|into)\s+(?:the\s+)?(?:active|current|focused)\s+(?:window|app|application)[.!]?$/i
+    );
+    if (typeInActiveMatch) {
+      const textToType = typeInActiveMatch[1].trim().slice(0, 4000);
+      if (textToType) {
+        return {
+          intent: "uacc_type_text",
+          actions: [{ type: "uacc_type_text", text: textToType }],
+        };
+      }
+    }
+
+    // 6. Scroll: "scroll down", "scroll up", "scroll to top", "scroll to bottom", "page down"
+    const scrollMatch = text.match(
+      /^(?:please\s+)?(?:scroll\s+(?:the\s+)?(?:page\s+)?(up|down|left|right|to\s+(?:the\s+)?top|to\s+(?:the\s+)?bottom)|page\s+(up|down))[.!]?$/i
+    );
+    if (scrollMatch) {
+      const raw = (scrollMatch[1] || scrollMatch[2] || "down").toLowerCase().trim();
+      let direction = "down";
+      let amount = 3;
+      if (raw.startsWith("to") && raw.includes("top")) { direction = "up"; amount = 50; }
+      else if (raw.startsWith("to") && raw.includes("bottom")) { direction = "down"; amount = 50; }
+      else if (raw === "up" || raw === "page up") { direction = "up"; amount = 5; }
+      else if (raw === "down" || raw === "page down") { direction = "down"; amount = 5; }
+      else if (raw === "left") { direction = "left"; amount = 3; }
+      else if (raw === "right") { direction = "right"; amount = 3; }
+      return {
+        intent: "uacc_scroll",
+        actions: [{ type: "uacc_scroll", direction, amount }],
+      };
+    }
+
+    // 7. Focus window: "switch to Chrome", "focus Chrome", "bring up Notepad", "go to VS Code"
+    const focusMatch = text.match(
+      /^(?:please\s+)?(?:switch\s+to|focus|bring\s+up|go\s+to|show|activate)\s+(?:the\s+)?([a-z0-9 ._-]{2,80})[.!]?$/i
+    );
+    if (focusMatch && !isClearlyInstructionalRequest(text)) {
+      const appTitle = focusMatch[1].trim();
+      if (appTitle && appTitle.length <= 80) {
+        return {
+          intent: "uacc_focus_window",
+          actions: [{ type: "uacc_focus_window", title: appTitle }],
+        };
+      }
     }
   }
 
@@ -516,6 +823,33 @@ export function normalizeIntentActions(rawCalls, allowAutoMemory, desktopControl
       }
     }
 
+    if (desktopControlEnabled && name === "press_hotkey" && !externalActionSelected) {
+      const keys = Array.isArray(args.keys)
+        ? args.keys.map((k) => String(k).trim().toLowerCase()).filter(Boolean).slice(0, 5)
+        : [];
+      if (keys.length > 0) {
+        actions.push({ type: "uacc_hotkey", keys });
+        externalActionSelected = true;
+      }
+    }
+
+    if (desktopControlEnabled && name === "scroll_desktop" && !externalActionSelected) {
+      const direction = ["up", "down", "left", "right"].includes(String(args.direction || "").toLowerCase())
+        ? String(args.direction).toLowerCase()
+        : "down";
+      const amount = Number.isFinite(args.amount) && args.amount > 0 ? Math.min(args.amount, 50) : 3;
+      actions.push({ type: "uacc_scroll", direction, amount });
+      externalActionSelected = true;
+    }
+
+    if (desktopControlEnabled && name === "focus_application_window" && !externalActionSelected) {
+      const title = String(args.title || "").trim().slice(0, 200);
+      if (title && !/[\r\n\0]/.test(title)) {
+        actions.push({ type: "uacc_focus_window", title });
+        externalActionSelected = true;
+      }
+    }
+
     if (name === "save_memory" && allowAutoMemory) {
       const title = String(args.title || "Useful detail").trim().slice(0, 100);
       const value = String(args.value || "").trim().slice(0, 1000);
@@ -562,17 +896,24 @@ export function validateIntentActions(message, actions) {
   const containsSensitiveData = /\b(?:password|passcode|pin|one[- ]time password|otp|api[- ]?key|access[- ]?token|secret|credit card|debit card|cvv|bank account|social security|ssn|medical diagnosis)\b/i.test(text);
   const explicitlyRequestsTyping = /\b(?:type|write|paste|enter|put)\b/i.test(normalized) &&
     /\b(?:open|launch|start|use|in|into)\b/i.test(normalized);
+  const explicitlyRequestsSaveToApp = isSaveGeneratedContentFollowUp(text);
 
   return (Array.isArray(actions) ? actions : []).filter((action) => {
-    const isExternal = ["search_web", "open_app", "open_app_and_type", "generate_and_type", "open_app_and_search", "search_in_application", "open_url", "open_folder", "uacc_click_element", "uacc_type_text"]
-      .includes(action.type);
+    const isExternal = [
+      "search_web", "open_app", "open_app_and_type", "generate_and_type",
+      "open_app_and_search", "search_in_application", "open_url", "open_folder",
+      "uacc_click_element", "uacc_type_text", "uacc_hotkey", "uacc_scroll", "uacc_focus_window",
+    ].includes(action.type);
 
     if (isExternal && negatesDesktopAction) return false;
     if (["open_app", "open_url", "open_folder", "search_in_application", "generate_and_type"].includes(action.type) && isInstructionalQuestion) return false;
-    if (["uacc_click_element", "uacc_type_text"].includes(action.type) && isInstructionalQuestion) return false;
-    if (action.type === "open_app_and_type" && !explicitlyRequestsTyping) return false;
+    if (["uacc_click_element", "uacc_type_text", "uacc_hotkey", "uacc_scroll", "uacc_focus_window"].includes(action.type) && isInstructionalQuestion) return false;
+    if (action.type === "open_app_and_type" && !explicitlyRequestsTyping && !explicitlyRequestsSaveToApp) return false;
     if (action.type === "uacc_click_element" && !/\b(?:click|tap|select|press)\b/i.test(normalized)) return false;
     if (action.type === "uacc_type_text" && !/\b(?:type|write|paste|enter|put)\b/i.test(normalized)) return false;
+    if (action.type === "uacc_hotkey" && !/\b(?:press|hit|use|send)\b/i.test(normalized)) return false;
+    if (action.type === "uacc_scroll" && !/\b(?:scroll|page)\b/i.test(normalized)) return false;
+    if (action.type === "uacc_focus_window" && !/\b(?:switch|focus|bring|go\s+to|show|activate)\b/i.test(normalized)) return false;
     if (["uacc_click_element", "uacc_type_text"].includes(action.type) && containsSensitiveData) return false;
     if (action.type === "save_memory" && containsSensitiveData) return false;
     if (action.type === "save_memory" && isQuestion && !explicitlyRequestsMemory) return false;

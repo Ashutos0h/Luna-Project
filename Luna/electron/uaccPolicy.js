@@ -101,15 +101,34 @@ export function validateUaccInvocation(toolName, rawArguments) {
     }
   }
 
+  if (name === "smart_click") {
+    const desc = String(args.description || args.query || args.text || "").trim();
+    if (!desc || desc.length > 300) {
+      return { valid: false, message: "A short description of what to click is required for visual matching." };
+    }
+  }
+
   if (["focus_window", "minimize_maximize", "resize_window", "move_window"].includes(name)) {
     if (!String(args.title || "").trim() || String(args.title).length > 200) {
       return { valid: false, message: "A valid application window title is required." };
     }
   }
 
-  if (["click", "hover", "scroll"].includes(name)) {
+  if (["click", "hover"].includes(name)) {
     if (!isIntegerInRange(args.x) || !isIntegerInRange(args.y)) {
       return { valid: false, message: "The screen coordinates are outside Luna's safe range." };
+    }
+  }
+
+  if (name === "scroll") {
+    // scroll can be element-based (no coords needed) or coordinate-based
+    const hasCoords = args.x !== undefined || args.y !== undefined;
+    if (hasCoords && (!isIntegerInRange(args.x) || !isIntegerInRange(args.y))) {
+      return { valid: false, message: "The scroll coordinates are outside Luna's safe range." };
+    }
+    const direction = String(args.direction || "down").toLowerCase();
+    if (!["up", "down", "left", "right"].includes(direction)) {
+      return { valid: false, message: "Scroll direction must be up, down, left, or right." };
     }
   }
 
@@ -122,8 +141,11 @@ export function validateUaccInvocation(toolName, rawArguments) {
 
   if (name === "hotkey") {
     const keys = args.keys;
-    if (!Array.isArray(keys) || keys.length === 0 || keys.length > 4 || keys.some((key) => !/^[a-z0-9]+$/i.test(String(key)))) {
-      return { valid: false, message: "The keyboard shortcut is not valid." };
+    // Allow letter/number keys AND special keys: enter, escape, tab, space, backspace, delete,
+    // home, end, pageup, pagedown, arrowup, arrowdown, arrowleft, arrowright, f1-f12, etc.
+    const ALLOWED_KEY = /^([a-z0-9]|f[1-9]|f1[0-2]|enter|return|escape|esc|tab|space|backspace|delete|del|home|end|pageup|pagedown|pgup|pgdn|up|down|left|right|ctrl|control|shift|alt|win|cmd|meta|plus|minus|insert|printscreen)$/i;
+    if (!Array.isArray(keys) || keys.length === 0 || keys.length > 5 || keys.some((key) => !ALLOWED_KEY.test(String(key).trim()))) {
+      return { valid: false, message: "The keyboard shortcut is not valid. Use key names like ctrl, shift, alt, enter, f5, etc." };
     }
   }
 
@@ -138,8 +160,17 @@ export function summarizeUaccAction(toolName, args) {
   const name = String(toolName || "");
   if (name === "launch_app") return `Open ${args.app}`;
   if (name === "open_url") return `Open ${args.url}`;
-  if (["type_text", "smart_type"].includes(name)) return `Type ${String(args.text || "").slice(0, 80)}`;
-  if (name === "hotkey") return `Press ${args.keys.join(" + ")}`;
-  if (["focus_window", "minimize_maximize", "resize_window", "move_window"].includes(name)) return `${name.replace(/_/g, " ")} for ${args.title}`;
+  if (["type_text", "smart_type"].includes(name)) return `Type "${String(args.text || "").slice(0, 80)}"`;
+  if (name === "hotkey") return `Press ${(args.keys || []).join(" + ")}`;
+  if (name === "click_element") return `Click "${args.name || "element"}"`;
+  if (name === "smart_click") return `Click "${args.description || args.query || "element"}" (visual match)`;
+  if (name === "scroll") return `Scroll ${args.direction || "down"} ${args.amount ? `(${args.amount}×)` : ""}`.trim();
+  if (name === "hover") return `Hover at (${args.x}, ${args.y})`;
+  if (name === "click") return `Click at (${args.x}, ${args.y})`;
+  if (name === "drag") return `Drag from (${args.start_x}, ${args.start_y}) to (${args.end_x}, ${args.end_y})`;
+  if (name === "focus_window") return `Focus window: ${args.title}`;
+  if (name === "minimize_maximize") return `${args.action || "Toggle"} window: ${args.title}`;
+  if (name === "resize_window") return `Resize window: ${args.title}`;
+  if (name === "move_window") return `Move window: ${args.title}`;
   return name.replace(/_/g, " ");
 }

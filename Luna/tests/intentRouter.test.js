@@ -75,6 +75,25 @@ test("generated writing requests are routed before the chat model can refuse the
     intent: "generate_and_type",
     actions: [{ type: "generate_and_type", application: "Notepad", continueChat: true }],
   });
+  assert.deepEqual(routeExplicitDesktopCommand("generate story and put i tinot notepad"), {
+    intent: "generate_and_type",
+    actions: [{ type: "generate_and_type", application: "Notepad", continueChat: true }],
+  });
+  assert.equal(routeClearlyConversationalIntent("generate story and put i tinot notepad", false), null);
+});
+
+test("follow-up save pastes the already generated story instead of claiming Notepad was updated", () => {
+  const history = [
+    { role: "user", content: "generate story and put it into notepad" },
+    { role: "assistant", content: `${"Once upon a time, in a quiet village, Lily found a hidden book and made three kind wishes. ".repeat(2)}\n\nWould you like me to generate another story or save this one?` },
+  ];
+  const route = routeExplicitDesktopCommand("save", history);
+  assert.equal(route.intent, "open_app_and_type");
+  assert.equal(route.actions[0].application, "Notepad");
+  assert.match(route.actions[0].text, /Lily found a hidden book/);
+  assert.equal(routeClearlyConversationalIntent("save", false, history), null);
+  assert.equal(routeExplicitDesktopCommand("id is not saved yet", history).intent, "open_app_and_type");
+  assert.equal(routeExplicitDesktopCommand("save"), null);
 });
 
 test("normalizes web search arguments and rejects extra external actions", () => {
@@ -240,3 +259,90 @@ test("fast conversational routing preserves safe automatic memory", () => {
   assert.equal(route.actions[0]?.type, "save_memory");
   assert.equal(route.actions[0]?.continueChat, true);
 });
+
+test("routes explicit UACC click and camera capture commands", () => {
+  assert.equal(routeClearlyConversationalIntent("Click Subscribe", false), null);
+  assert.equal(routeClearlyConversationalIntent("Click picture", false), null);
+
+  const clickSub = routeExplicitDesktopCommand("Click Subscribe", [], true);
+  assert.deepEqual(clickSub, {
+    intent: "uacc_click_element",
+    actions: [{ type: "uacc_click_element", element: "Subscribe" }],
+  });
+
+  const clickSubBtn = routeExplicitDesktopCommand("Click the Subscribe button", [], true);
+  assert.deepEqual(clickSubBtn, {
+    intent: "uacc_click_element",
+    actions: [{ type: "uacc_click_element", element: "Subscribe" }],
+  });
+
+  const clickPic = routeExplicitDesktopCommand("Click picture", [], true);
+  assert.deepEqual(clickPic, {
+    intent: "uacc_click_element",
+    actions: [{ type: "uacc_click_element", element: "Take Photo", elementType: "button" }],
+  });
+
+  const compoundCamera = routeExplicitDesktopCommand("open camera and click picture", [], true);
+  assert.deepEqual(compoundCamera, {
+    intent: "uacc_click_element",
+    actions: [
+      { type: "open_app", application: "Camera" },
+      { type: "uacc_click_element", element: "Take Photo", elementType: "button", delayMs: 1500 },
+    ],
+  });
+
+  assert.equal(routeExplicitDesktopCommand("Click Subscribe", [], false), null);
+});
+
+test("routes explicit UACC hotkeys, scroll, and focus commands", () => {
+  const hotkey = routeExplicitDesktopCommand("press Ctrl+S", [], true);
+  assert.deepEqual(hotkey, {
+    intent: "uacc_hotkey",
+    actions: [{ type: "uacc_hotkey", keys: ["ctrl", "s"] }],
+  });
+
+  const enterKey = routeExplicitDesktopCommand("press Enter", [], true);
+  assert.deepEqual(enterKey, {
+    intent: "uacc_hotkey",
+    actions: [{ type: "uacc_hotkey", keys: ["enter"] }],
+  });
+
+  const scrollDown = routeExplicitDesktopCommand("scroll down", [], true);
+  assert.deepEqual(scrollDown, {
+    intent: "uacc_scroll",
+    actions: [{ type: "uacc_scroll", direction: "down", amount: 5 }],
+  });
+
+  const scrollToTop = routeExplicitDesktopCommand("scroll to top", [], true);
+  assert.deepEqual(scrollToTop, {
+    intent: "uacc_scroll",
+    actions: [{ type: "uacc_scroll", direction: "up", amount: 50 }],
+  });
+
+  const focusChrome = routeExplicitDesktopCommand("switch to Chrome", [], true);
+  assert.deepEqual(focusChrome, {
+    intent: "uacc_focus_window",
+    actions: [{ type: "uacc_focus_window", title: "Chrome" }],
+  });
+
+  // Disabled when desktop control is false
+  assert.equal(routeExplicitDesktopCommand("press Ctrl+S", [], false), null);
+  assert.equal(routeExplicitDesktopCommand("scroll down", [], false), null);
+  assert.equal(routeExplicitDesktopCommand("switch to Chrome", [], false), null);
+});
+
+test("routes explicit open-and-type and platform search aliases like yt", () => {
+  const openAndWrite = routeExplicitDesktopCommand("open notepad and write hello ashutosh", [], true);
+  assert.deepEqual(openAndWrite, {
+    intent: "open_app_and_type",
+    actions: [{ type: "open_app_and_type", application: "Notepad", text: "hello ashutosh" }],
+  });
+
+  const ytSearch = routeExplicitDesktopCommand("open yt and search bbs", [], true);
+  assert.deepEqual(ytSearch, {
+    intent: "search_in_application",
+    actions: [{ type: "search_in_application", application: "yt", query: "bbs" }],
+  });
+});
+
+

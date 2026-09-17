@@ -30,7 +30,7 @@ function NavIcon({ name }) {
     privacy: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>,
   };
 
-  return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+  return <svg className="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
 function Sidebar({
@@ -138,18 +138,28 @@ function Sidebar({
 
   function openChatSearch() {
     setCollapsed(false);
-    setSearchOpen(true);
+    setSearchOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        window.requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+      return next;
+    });
     setCurrentPage("chat");
-    window.requestAnimationFrame(() => searchInputRef.current?.focus());
   }
 
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
-      <div className="brand-block">
-        <div className="brand-mark"><img src={lunaIcon} alt="" /></div>
-        <div className="brand-copy">
-          <h1 className="logo">{settings.assistantName}</h1>
-        </div>
+      {/* ── Top bar: logo + collapse toggle ── */}
+      <div className="sidebar-topbar">
+        {!collapsed && (
+          <div className="brand-block">
+            <div className="brand-mark"><img src={lunaIcon} alt="" /></div>
+            <div className="brand-copy">
+              <h1 className="logo">{settings.assistantName}</h1>
+            </div>
+          </div>
+        )}
         <button
           type="button"
           className="sidebar-collapse"
@@ -160,59 +170,73 @@ function Sidebar({
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3.5" y="4" width="17" height="16" rx="3" />
-            <path d="M9 4v16" />
-          </svg>
+          {collapsed ? (
+            /* chevrons-right / expand */
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="3.5" />
+              <path d="M9 3v18" />
+              <path d="m14 10 3 2-3 2" />
+            </svg>
+          ) : (
+            /* chevrons-left / collapse */
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="3.5" />
+              <path d="M9 3v18" />
+              <path d="m14 14-3-2 3-2" />
+            </svg>
+          )}
         </button>
       </div>
+
 
       <div className="sidebar-primary-actions">
         <button className="new-chat-btn" onClick={startNewChat} aria-label="New chat" title="New chat (Ctrl+N)">
           <NavIcon name="compose" />
           <span>New chat</span>
         </button>
-        <button
-          type="button"
-          className={`search-chats-button${searchOpen ? " active" : ""}`}
-          onClick={openChatSearch}
-          aria-expanded={searchOpen}
-          aria-controls="conversation-search"
-          title="Search chats"
-        >
-          <NavIcon name="search" />
-          <span>Search chats</span>
-        </button>
       </div>
-
-      {(searchOpen || searchQuery) && (
-        <div className="conversation-search" id="conversation-search">
-          <NavIcon name="search" />
-          <input
-            ref={searchInputRef}
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search conversations"
-            aria-label="Search conversations"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery("");
-              setSearchOpen(false);
-            }}
-            aria-label="Close search"
-            title="Close search"
-          >×</button>
-        </div>
-      )}
 
       <div className="history-section">
         <div className="history-heading">
           <p className="sidebar-label">Recent chats</p>
-          <span>{conversations.length}</span>
+          <div className="history-heading-right">
+            <span className="history-count">{conversations.length}</span>
+            <button
+              type="button"
+              className={`history-search-btn${searchOpen ? " active" : ""}`}
+              onClick={openChatSearch}
+              aria-expanded={searchOpen}
+              aria-controls="conversation-search"
+              aria-label="Search chats"
+              title="Search chats"
+            >
+              <NavIcon name="search" />
+            </button>
+          </div>
         </div>
+
+        {(searchOpen || searchQuery) && (
+          <div className="conversation-search" id="conversation-search">
+            <NavIcon name="search" />
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search conversations"
+              aria-label="Search conversations"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setSearchOpen(false);
+              }}
+              aria-label="Close search"
+              title="Close search"
+            >×</button>
+          </div>
+        )}
         {conversations.length === 0 ? (
           <p className="empty-history">Your conversations will appear here.</p>
         ) : visibleConversations.length === 0 ? (
@@ -262,7 +286,13 @@ function Sidebar({
                   title="Conversation actions"
                   aria-label={`Actions for ${chat.title}`}
                   aria-expanded={menuChatId === chat.id}
-                >•••</button>
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="1.8" />
+                    <circle cx="12" cy="12" r="1.8" />
+                    <circle cx="12" cy="19" r="1.8" />
+                  </svg>
+                </button>
                 {menuChatId === chat.id && (
                   <div className="conversation-menu" role="menu">
                     <button type="button" onClick={() => { onTogglePin(chat.id); setMenuChatId(null); }} role="menuitem">
@@ -309,7 +339,7 @@ function Sidebar({
               }}
               role="menuitem"
             >
-              <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg className="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M10 17l5-5-5-5" /><path d="M15 12H3" /><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
               </svg>
               <span>Log out</span>
@@ -326,7 +356,7 @@ function Sidebar({
         >
           <span className="profile-avatar">{(settings.userName || "U").charAt(0).toUpperCase()}</span>
           <span className="sidebar-profile-copy"><strong>{settings.userName || "User"}</strong><span>{settings.profession || "Luna user"}</span></span>
-          <svg className="profile-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg className="profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="m7 15 5-5 5 5" />
           </svg>
         </button>

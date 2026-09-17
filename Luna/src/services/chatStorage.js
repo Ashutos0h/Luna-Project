@@ -45,6 +45,7 @@ export function normalizeConversations(value) {
             id: chatId,
             title: String(chat.title || "Untitled conversation").trim().slice(0, 100) || "Untitled conversation",
             pinned: Boolean(chat.pinned),
+            customTitle: Boolean(chat.customTitle),
             updatedAt: Number.isFinite(Number(chat.updatedAt)) && Number(chat.updatedAt) > 0 ? Number(chat.updatedAt) : (Number(chat.id) || 0),
             messages,
         }];
