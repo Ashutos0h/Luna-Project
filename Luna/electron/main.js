@@ -256,6 +256,69 @@ function selectRelevantDocumentContext(documentText, question, characterBudget) 
   return excerpt.slice(0, characterBudget);
 }
 
+function silencePeBinary(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    const fd = fs.openSync(filePath, "r+");
+    try {
+      const dosHeader = Buffer.alloc(64);
+      fs.readSync(fd, dosHeader, 0, 64, 0);
+      if (dosHeader.readUInt16LE(0) !== 0x5a4d) return false;
+      const peOffset = dosHeader.readInt32LE(0x3c);
+      const peSig = Buffer.alloc(4);
+      fs.readSync(fd, peSig, 0, 4, peOffset);
+      if (peSig.readUInt32LE(0) !== 0x00004550) return false;
+
+      const subsystemOffset = peOffset + 0x5c;
+      const subsystemBuf = Buffer.alloc(2);
+      fs.readSync(fd, subsystemBuf, 0, 2, subsystemOffset);
+      const currentSubsystem = subsystemBuf.readUInt16LE(0);
+
+      // 3 = IMAGE_SUBSYSTEM_WINDOWS_CUI (Console - causes conhost window flash)
+      // 2 = IMAGE_SUBSYSTEM_WINDOWS_GUI (GUI - prevents conhost/console window completely)
+      if (currentSubsystem === 3) {
+        const patchBuf = Buffer.alloc(2);
+        patchBuf.writeUInt16LE(2, 0);
+        fs.writeSync(fd, patchBuf, 0, 2, subsystemOffset);
+        log.info(`Silenced console subsystem for ${path.basename(filePath)}`);
+        return true;
+      }
+      return true;
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    /* ignore locked or access-denied binaries */
+    return false;
+  }
+}
+
+function ensureOllamaRunnersSilent() {
+  if (process.platform !== "win32") return;
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const progFiles = process.env.ProgramFiles || "C:\\Program Files";
+  const searchDirs = [
+    path.join(localAppData, "Programs", "Ollama", "lib", "ollama"),
+    path.join(localAppData, "Programs", "Ollama", "lib"),
+    path.join(progFiles, "Ollama", "lib", "ollama"),
+    path.join(progFiles, "Ollama", "lib"),
+  ];
+
+  for (const dir of searchDirs) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        if (file.toLowerCase().endsWith(".exe") && file.toLowerCase().startsWith("llama-")) {
+          silencePeBinary(path.join(dir, file));
+        }
+      }
+    } catch {
+      /* ignore directory read error */
+    }
+  }
+}
+
 function findOllamaExecutable() {
   const localAppData = process.env.LOCALAPPDATA || "";
   const programFiles = process.env.ProgramFiles || "";
@@ -278,6 +341,7 @@ async function isOllamaRunning() {
 }
 
 async function ensureOllamaRunning() {
+  ensureOllamaRunnersSilent();
   if (await isOllamaRunning()) return true;
   if (ollamaStartPromise) return ollamaStartPromise;
 
@@ -287,6 +351,7 @@ async function ensureOllamaRunning() {
   lastOllamaStartAttempt = Date.now();
 
   ollamaStartPromise = (async () => {
+    ensureOllamaRunnersSilent();
     const executable = findOllamaExecutable() || "ollama";
 
     try {
@@ -944,6 +1009,7 @@ app.whenReady().then(() => {
 
   if (!hasSingleInstanceLock) return;
 
+  ensureOllamaRunnersSilent();
   createWindow();
 
   // Start the local model service in the background for returning users.
@@ -1366,6 +1432,7 @@ function launchCommand(command) {
       const child = spawn(command, [], {
         detached: true,
         stdio: "ignore",
+        windowsHide: true,
         shell: false,
       });
       let settled = false;
@@ -1394,11 +1461,13 @@ function runSilentShellLaunch(command) {
     const tempDir = os.tmpdir();
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const vbsFile = path.join(tempDir, `luna_launch_${id}.vbs`);
+    const isConsoleOrShell = /^(?:powershell|cmd|wt|bash)/i.test(command) || /\.(cmd|bat|ps1)$/i.test(command);
+    const winStyle = isConsoleOrShell ? 0 : 1;
 
     const vbs = [
       'Set sh = CreateObject("WScript.Shell")',
       'On Error Resume Next',
-      `sh.Run "${command.replace(/"/g, '""')}", 1, False`,
+      `sh.Run "${command.replace(/"/g, '""')}", ${winStyle}, False`,
       'If Err.Number <> 0 Then WScript.Quit 1',
       'Set sh = Nothing'
     ].join("\r\n");
@@ -1421,6 +1490,7 @@ function launchCommandWithArgument(command, argument) {
       const child = spawn(command, [argument], {
         detached: true,
         stdio: "ignore",
+        windowsHide: true,
         shell: false,
       });
       let settled = false;
@@ -1448,12 +1518,14 @@ function runSilentShellLaunchWithArg(command, argument) {
     const tempDir = os.tmpdir();
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const vbsFile = path.join(tempDir, `luna_launch_${id}.vbs`);
+    const isConsoleOrShell = /^(?:powershell|cmd|wt|bash)/i.test(command) || /\.(cmd|bat|ps1)$/i.test(command);
+    const winStyle = isConsoleOrShell ? 0 : 1;
 
     const fullCmd = `""${command.replace(/"/g, '""')}"" ""${argument.replace(/"/g, '""')}""`;
     const vbs = [
       'Set sh = CreateObject("WScript.Shell")',
       'On Error Resume Next',
-      `sh.Run "${fullCmd}", 1, False`,
+      `sh.Run "${fullCmd}", ${winStyle}, False`,
       'If Err.Number <> 0 Then WScript.Quit 1',
       'Set sh = Nothing'
     ].join("\r\n");
@@ -2031,21 +2103,26 @@ ipcMain.handle("search-in-application", async (event, request) => {
     return { success: false, message: "A valid application and search query are required." };
   }
 
-  const parentWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow;
-  const preview = query.length > 240 ? `${query.slice(0, 240)}…` : query;
-  const confirmation = await dialog.showMessageBox(parentWindow, {
-    type: "question",
-    buttons: ["Cancel", "Search"],
-    defaultId: 1,
-    cancelId: 0,
-    noLink: true,
-    title: "Confirm application search",
-    message: `Search for this in ${application}?`,
-    detail: preview,
-  });
+  const appLower = application.toLowerCase();
+  const isDirectMediaOrWeb = ["spotify", "youtube", "netflix", "apple music", "music"].includes(appLower) || Boolean(getPlatformSearchUrl(application, query));
 
-  if (confirmation.response !== 1) {
-    return { success: false, cancelled: true, message: "Application search was cancelled." };
+  if (!isDirectMediaOrWeb) {
+    const parentWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    const preview = query.length > 240 ? `${query.slice(0, 240)}…` : query;
+    const confirmation = await dialog.showMessageBox(parentWindow, {
+      type: "question",
+      buttons: ["Cancel", "Search"],
+      defaultId: 1,
+      cancelId: 0,
+      noLink: true,
+      title: "Confirm application search",
+      message: `Search for this in ${application}?`,
+      detail: preview,
+    });
+
+    if (confirmation.response !== 1) {
+      return { success: false, cancelled: true, message: "Application search was cancelled." };
+    }
   }
 
   return searchInApplication(application, query, usesAdvancedControl);
@@ -2886,7 +2963,7 @@ Topic Title:`;
         stream: false,
         options: { temperature: 0.1, num_predict: 20 },
       },
-      { timeout: 10000 }
+      { timeout: 25000 }
     );
 
     const raw = String(response.data?.response || "").trim();
