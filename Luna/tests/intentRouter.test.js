@@ -343,6 +343,12 @@ test("routes explicit open-and-type and platform search aliases like yt", () => 
     intent: "search_in_application",
     actions: [{ type: "search_in_application", application: "yt", query: "bbs" }],
   });
+
+  const spotifyPlay = routeExplicitDesktopCommand("hey can you open spotify and play kabira", [], false);
+  assert.deepEqual(spotifyPlay, {
+    intent: "search_in_application",
+    actions: [{ type: "search_in_application", application: "spotify", query: "kabira" }],
+  });
 });
 
 

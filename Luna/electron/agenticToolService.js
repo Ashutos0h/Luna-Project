@@ -149,6 +149,7 @@ export async function executeAgenticToolCall(call, context = {}) {
   const {
     openDesktopApplication,
     pasteTextIntoApplication,
+    executeBackgroundShellCommand,
     shell,
     dialog,
     mainWindow,
@@ -228,7 +229,14 @@ export async function executeAgenticToolCall(call, context = {}) {
       return { success: false, message: "Application name is required." };
     }
 
-    // If typing text is requested, require user confirmation
+    const isShellApp = /^(?:powershell|cmd|terminal|command prompt|bash)$/i.test(application);
+
+    // If typing text or running a command in a shell/terminal, process it silently in the background!
+    if (isShellApp && textToType && typeof executeBackgroundShellCommand === "function") {
+      return executeBackgroundShellCommand(application, textToType);
+    }
+
+    // If typing text is requested for GUI apps, require user confirmation
     if (textToType) {
       const win = parentWindow || mainWindow;
       const preview = textToType.length > 240 ? `${textToType.slice(0, 240)}…` : textToType;

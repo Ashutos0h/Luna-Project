@@ -156,13 +156,13 @@ function getOllamaGenerationOptions(
     ? (hasDocument ? 4096 : (isSmallModel ? 2048 : 4096))
     : (mode === "balanced" ? 4096 : 8192);
 
-  // Detect physical CPU core count for optimal thread allocation.
-  // num_thread = physical cores (NOT logical/hyperthreaded) for best throughput.
-  // On a typical 8-core Windows machine: 8 physical = 16 logical → use 8.
+  // Empirical benchmark on 12th Gen Intel hybrid CPU (i5-1240P / 16 threads):
+  // - 6 threads: 10.76 tok/s (PEAK)
+  // - 8 threads: 6.87 tok/s (36% drop due to E-core synchronization stalls)
+  // - 4 threads: 8.45 tok/s (ultra-low 0.10s prefill)
+  // Therefore, cap threads at 6 to stay strictly in the high-performance P-core envelope.
   const logicalCores = os.cpus().length;
-  // Use physical cores: hyperthreading doubles logical, so divide by 2 for safety.
-  // Floor at 4, cap at 12 to avoid over-committing the scheduler.
-  const numThreads = Math.min(12, Math.max(4, Math.floor(logicalCores / 2)));
+  const numThreads = Math.min(6, Math.max(4, Math.floor(logicalCores / 2)));
 
   return {
     temperature: mode === "fast" ? 0.2 : 0.3,
@@ -297,6 +297,11 @@ async function ensureOllamaRunning() {
           detached: true,
           windowsHide: true,
           stdio: "ignore",
+          env: {
+            ...process.env,
+            OLLAMA_KEEP_ALIVE: "24h",
+            OLLAMA_IGPU_ENABLE: "1",
+          },
         });
         child.once("error", reject);
         child.once("spawn", () => {
@@ -371,12 +376,14 @@ async function preloadOllamaModel(modelName) {
     }
 
     try {
+      const warmupOptions = getOllamaGenerationOptions(model, { performanceMode: "fast" });
       await axios.post(
         OLLAMA_GENERATE_URL,
         {
           model,
           stream: false,
-          keep_alive: "30m",
+          keep_alive: "24h",
+          options: warmupOptions,
         },
         { timeout: getOllamaRequestTimeout(model) }
       );
@@ -1093,8 +1100,8 @@ async function classifyIntentWithRouter({
 // ============================================================
 
 const appAliases = {
-  calculator: "calc",
-  calc: "calc",
+  calculator: "calculator:",
+  calc: "calculator:",
   notepad: "notepad",
   "note pad": "notepad",
   paint: "mspaint",
@@ -1130,7 +1137,7 @@ const appAliases = {
   camera: "microsoft.windows.camera:",
   store: "ms-windows-store:",
   "microsoft store": "ms-windows-store:",
-  spotify: "spotify",
+  spotify: "spotify:",
   vlc: "vlc",
   whatsapp: "whatsapp:",
   discord: "discord",
@@ -1267,24 +1274,199 @@ function findStartMenuShortcut(appName) {
   return matches[0] || null;
 }
 
+function executeBackgroundShellCommand(shellType, commandText) {
+  return new Promise((resolve) => {
+    const cleanCommand = String(commandText || "").trim();
+    if (!cleanCommand) {
+      return resolve({ success: false, message: "No command provided to execute." });
+    }
+
+    const isCmd = /^cmd/i.test(String(shellType || ""));
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempDir = os.tmpdir();
+    const vbsFile = path.join(tempDir, `luna_exec_${id}.vbs`);
+    const outFile = path.join(tempDir, `luna_out_${id}.txt`);
+    const scriptFile = path.join(tempDir, `luna_script_${id}.${isCmd ? "cmd" : "ps1"}`);
+
+    try {
+      if (isCmd) {
+        fs.writeFileSync(scriptFile, `@echo off\r\n${cleanCommand}\r\n`, "utf8");
+      } else {
+        fs.writeFileSync(scriptFile, cleanCommand, "utf8");
+      }
+
+      let runCommandLine = "";
+      if (isCmd) {
+        runCommandLine = `cmd.exe /d /s /c call ""${scriptFile}"" > ""${outFile}"" 2>&1`;
+      } else {
+        runCommandLine = `cmd.exe /d /s /c powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""${scriptFile}"" > ""${outFile}"" 2>&1`;
+      }
+
+      // wscript.exe is a GUI subsystem binary (IMAGE_SUBSYSTEM_WINDOWS_GUI).
+      // Unlike console executables, running wscript.exe NEVER triggers Windows Terminal,
+      // OpenConsole, or conhost. Passing window style 0 (SW_HIDE) ensures child
+      // processes run completely invisible with zero window flash or flickering.
+      const vbs = [
+        'Set sh = CreateObject("WScript.Shell")',
+        `sh.Run "${runCommandLine}", 0, True`,
+        'Set sh = Nothing'
+      ].join("\r\n");
+
+      fs.writeFileSync(vbsFile, vbs, "utf8");
+
+      execFile("wscript.exe", ["//B", "//Nologo", vbsFile], { windowsHide: true, timeout: 30000 }, (error) => {
+        let output = "";
+        if (fs.existsSync(outFile)) {
+          try {
+            output = fs.readFileSync(outFile, "utf8").trim();
+          } catch {
+            /* ignore read error */
+          }
+        }
+
+        // Cleanup temporary execution files safely
+        try { fs.unlinkSync(vbsFile); } catch { /* ignore cleanup error */ }
+        try { fs.unlinkSync(outFile); } catch { /* ignore cleanup error */ }
+        try { fs.unlinkSync(scriptFile); } catch { /* ignore cleanup error */ }
+
+        if (error && !output) {
+          resolve({
+            success: false,
+            message: `Command failed in background: ${error.message}`,
+          });
+        } else {
+          resolve({
+            success: !error,
+            output: output.slice(0, 4000),
+            message: output
+              ? `Executed in background:\n\`\`\`\n${output.slice(0, 2000)}\n\`\`\``
+              : "Command executed silently in the background.",
+          });
+        }
+      });
+    } catch (err) {
+      try { if (fs.existsSync(vbsFile)) fs.unlinkSync(vbsFile); } catch { /* ignore cleanup error */ }
+      try { if (fs.existsSync(outFile)) fs.unlinkSync(outFile); } catch { /* ignore cleanup error */ }
+      try { if (fs.existsSync(scriptFile)) fs.unlinkSync(scriptFile); } catch { /* ignore cleanup error */ }
+      resolve({ success: false, message: `Could not execute command: ${err.message}` });
+    }
+  });
+}
+
 function launchCommand(command) {
   return new Promise((resolve) => {
-    const encoded = Buffer.from(command, "utf8").toString("base64");
-    const script = `$ErrorActionPreference = 'Stop'; try { Start-Process -FilePath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}'))) -ErrorAction Stop | Out-Null } catch { exit 1 }`;
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], { windowsHide: true, timeout: 15000 }, (error) => {
-      resolve(!error);
-    });
+    // 1. If it's a URI scheme (like calc:, spotify:, etc.), openExternal handles it natively
+    if (command.includes(":") && !command.includes("\\") && !command.includes("/")) {
+      shell.openExternal(command).then(() => resolve(true)).catch(() => resolve(false));
+      return;
+    }
+
+    // 2. Direct native launch with spawn (no PowerShell invocation, 0 window flash)
+    try {
+      const child = spawn(command, [], {
+        detached: true,
+        stdio: "ignore",
+        shell: false,
+      });
+      let settled = false;
+      child.once("spawn", () => {
+        child.unref();
+        settled = true;
+        resolve(true);
+      });
+      child.once("error", () => {
+        if (settled) return;
+        settled = true;
+        runSilentShellLaunch(command).then(resolve);
+      });
+      return;
+    } catch {
+      // Fall through to silent shell launch
+    }
+
+    runSilentShellLaunch(command).then(resolve);
+  });
+}
+
+function runSilentShellLaunch(command) {
+  return new Promise((resolve) => {
+    // Silent launch through wscript GUI host prevents Windows Terminal / conhost flicker
+    const tempDir = os.tmpdir();
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const vbsFile = path.join(tempDir, `luna_launch_${id}.vbs`);
+
+    const vbs = [
+      'Set sh = CreateObject("WScript.Shell")',
+      'On Error Resume Next',
+      `sh.Run "${command.replace(/"/g, '""')}", 1, False`,
+      'If Err.Number <> 0 Then WScript.Quit 1',
+      'Set sh = Nothing'
+    ].join("\r\n");
+
+    try {
+      fs.writeFileSync(vbsFile, vbs, "utf8");
+      execFile("wscript.exe", ["//B", "//Nologo", vbsFile], { windowsHide: true }, (err) => {
+        try { fs.unlinkSync(vbsFile); } catch { /* ignore cleanup error */ }
+        resolve(!err);
+      });
+    } catch {
+      resolve(false);
+    }
   });
 }
 
 function launchCommandWithArgument(command, argument) {
   return new Promise((resolve) => {
-    const encodedCommand = Buffer.from(command, "utf8").toString("base64");
-    const encodedArgument = Buffer.from(argument, "utf8").toString("base64");
-    const script = `$ErrorActionPreference = 'Stop'; try { $file = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedCommand}')); $argument = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedArgument}')); Start-Process -FilePath $file -ArgumentList $argument -ErrorAction Stop | Out-Null } catch { exit 1 }`;
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], { windowsHide: true, timeout: 15000 }, (error) => {
-      resolve(!error);
-    });
+    try {
+      const child = spawn(command, [argument], {
+        detached: true,
+        stdio: "ignore",
+        shell: false,
+      });
+      let settled = false;
+      child.once("spawn", () => {
+        child.unref();
+        settled = true;
+        resolve(true);
+      });
+      child.once("error", () => {
+        if (settled) return;
+        settled = true;
+        runSilentShellLaunchWithArg(command, argument).then(resolve);
+      });
+      return;
+    } catch {
+      // Fall through
+    }
+
+    runSilentShellLaunchWithArg(command, argument).then(resolve);
+  });
+}
+
+function runSilentShellLaunchWithArg(command, argument) {
+  return new Promise((resolve) => {
+    const tempDir = os.tmpdir();
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const vbsFile = path.join(tempDir, `luna_launch_${id}.vbs`);
+
+    const fullCmd = `""${command.replace(/"/g, '""')}"" ""${argument.replace(/"/g, '""')}""`;
+    const vbs = [
+      'Set sh = CreateObject("WScript.Shell")',
+      'On Error Resume Next',
+      `sh.Run "${fullCmd}", 1, False`,
+      'If Err.Number <> 0 Then WScript.Quit 1',
+      'Set sh = Nothing'
+    ].join("\r\n");
+
+    try {
+      fs.writeFileSync(vbsFile, vbs, "utf8");
+      execFile("wscript.exe", ["//B", "//Nologo", vbsFile], { windowsHide: true }, (err) => {
+        try { fs.unlinkSync(vbsFile); } catch { /* ignore cleanup error */ }
+        resolve(!err);
+      });
+    } catch {
+      resolve(false);
+    }
   });
 }
 
@@ -1474,10 +1656,10 @@ async function openDesktopApplication(appName) {
     const exePath = findExeInCommonPaths(normalizedName);
     if (exePath) {
       console.log(`Found exe in common paths: ${exePath}`);
-      execFile(exePath, (err) => {
-        if (err) console.error("Failed to launch found exe:", err);
-      });
-      return { success: true, message: `Opening ${rawName}.`, activationTarget: rawName };
+      const errorMessage = await shell.openPath(exePath);
+      if (!errorMessage) {
+        return { success: true, message: `Opening ${rawName}.`, activationTarget: rawName };
+      }
     }
 
     // The command is strictly allowlisted to simple executable-style names.
@@ -1698,53 +1880,62 @@ async function pasteTextIntoApplication(application, text) {
     rtf: clipboard.readRTF(),
     image: clipboard.readImage(),
   };
-  const encodedTarget = Buffer.from(application, "utf8").toString("base64");
-  const automationScript = `
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Windows.Forms
-$target = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${encodedTarget}'))
-$activator = New-Object -ComObject WScript.Shell
-$processName = switch -Regex ($target) {
-  '^(google )?chrome$' { 'chrome'; break }
-  '^(microsoft )?edge$' { 'msedge'; break }
-  '^note ?pad$' { 'notepad'; break }
-  default { $target }
-}
-$activated = $false
-for ($attempt = 0; $attempt -lt 32; $attempt++) {
-  $windows = Get-Process -Name $processName -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Sort-Object StartTime -Descending
-  foreach ($candidate in $windows) {
-    if ($activator.AppActivate([int]$candidate.Id)) { $activated = $true; break }
-  }
-  if (-not $activated) { $activated = $activator.AppActivate($target) }
-  if ($activated) { break }
-  Start-Sleep -Milliseconds 250
-}
-if (-not $activated) { exit 2 }
-Start-Sleep -Milliseconds 250
-if ($processName -in @('chrome', 'msedge', 'firefox', 'brave')) {
-  [System.Windows.Forms.SendKeys]::SendWait('^l')
-  Start-Sleep -Milliseconds 100
-}
-[System.Windows.Forms.SendKeys]::SendWait('^v')
-Start-Sleep -Milliseconds 250
-`;
 
   clipboard.writeText(text);
+
+  const tempDir = os.tmpdir();
+  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const vbsFile = path.join(tempDir, `luna_paste_${id}.vbs`);
+
+  const escapedApp = String(application || "").trim().replace(/"/g, '""');
+  const vbs = [
+    'Set sh = CreateObject("WScript.Shell")',
+    `target = "${escapedApp}"`,
+    'processName = target',
+    'If LCase(target) = "chrome" Or LCase(target) = "google chrome" Then',
+    '  processName = "chrome"',
+    'ElseIf LCase(target) = "edge" Or LCase(target) = "microsoft edge" Then',
+    '  processName = "msedge"',
+    'ElseIf LCase(target) = "notepad" Or LCase(target) = "note pad" Then',
+    '  processName = "notepad"',
+    'End If',
+    'activated = False',
+    'For i = 1 To 32',
+    '  If sh.AppActivate(processName) Then',
+    '    activated = True',
+    '    Exit For',
+    '  End If',
+    '  If sh.AppActivate(target) Then',
+    '    activated = True',
+    '    Exit For',
+    '  End If',
+    '  WScript.Sleep 200',
+    'Next',
+    'If Not activated Then',
+    '  WScript.Quit 2',
+    'End If',
+    'WScript.Sleep 200',
+    'If LCase(processName) = "chrome" Or LCase(processName) = "msedge" Or LCase(processName) = "firefox" Or LCase(processName) = "brave" Then',
+    '  sh.SendKeys "^l"',
+    '  WScript.Sleep 100',
+    'End If',
+    'sh.SendKeys "^v"',
+    'WScript.Sleep 200',
+    'Set sh = Nothing'
+  ].join("\r\n");
+
   try {
+    fs.writeFileSync(vbsFile, vbs, "utf8");
     await new Promise((resolve, reject) => {
-      execFile("powershell.exe", [
-        "-NoProfile",
-        "-NonInteractive",
-        "-WindowStyle", "Hidden",
-        "-EncodedCommand", Buffer.from(automationScript, "utf16le").toString("base64"),
-      ], { windowsHide: true, timeout: 15000 }, (error) => {
+      execFile("wscript.exe", ["//B", "//Nologo", vbsFile], { windowsHide: true, timeout: 15000 }, (error) => {
+        try { fs.unlinkSync(vbsFile); } catch { /* ignore cleanup error */ }
         if (error) reject(error);
         else resolve();
       });
     });
     return true;
   } finally {
+    try { if (fs.existsSync(vbsFile)) fs.unlinkSync(vbsFile); } catch { /* ignore cleanup error */ }
     // Restore the user's clipboard after the paste has completed.
     const restoreData = {};
     if (clipboardSnapshot.text) restoreData.text = clipboardSnapshot.text;
@@ -1763,6 +1954,12 @@ ipcMain.handle("open-app-and-type", async (event, request) => {
 
   if (!application || /[\r\n\0]/.test(application) || !text.trim()) {
     return { success: false, message: "A valid application and text are required." };
+  }
+
+  const isShell = /^(?:powershell|cmd|terminal|command prompt|bash)$/i.test(application);
+  if (isShell) {
+    // Process terminal/shell commands silently in the background without popping open any shell window
+    return executeBackgroundShellCommand(application, text);
   }
 
   const parentWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow;
@@ -2320,7 +2517,7 @@ ${message}
         tools: agenticTools,
         stream: false,
         think: performanceMode === "quality",
-        keep_alive: "30m",
+        keep_alive: "24h",
         options: {
           ...generationOptions,
           num_predict: 256,
@@ -2452,6 +2649,7 @@ ${message}
         const toolContext = {
           openDesktopApplication,
           pasteTextIntoApplication,
+          executeBackgroundShellCommand,
           searchInApplication,
           shell,
           dialog,
@@ -2469,7 +2667,19 @@ ${message}
           let statusLabel = "Working…";
           if (toolName === "web_search") statusLabel = "Searching the web for verified facts…";
           else if (toolName === "open_media") statusLabel = "Opening media…";
-          else if (toolName === "open_application") statusLabel = "Opening application…";
+          else if (toolName === "open_application") {
+            let app = "";
+            try {
+              const parsed = typeof toolCall?.function?.arguments === "string"
+                ? JSON.parse(toolCall.function.arguments)
+                : (toolCall?.function?.arguments || {});
+              app = String(parsed.application || "");
+            } catch {
+              app = "";
+            }
+            const isShell = /^(?:powershell|cmd|terminal|command prompt|bash)$/i.test(app);
+            statusLabel = isShell ? "Processing command in background…" : "Opening application…";
+          }
           else if (toolName === "desktop_control") statusLabel = "Executing desktop action…";
           else if (toolName === "save_memory") statusLabel = "Saving memory…";
 
@@ -2519,7 +2729,7 @@ ${message}
             messages: continuationMessages,
             stream: true,
             think: performanceMode === "quality",
-            keep_alive: "30m",
+            keep_alive: "24h",
             options: generationOptions,
           },
           {

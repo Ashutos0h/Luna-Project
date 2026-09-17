@@ -475,9 +475,16 @@ function routePendingGeneratedWriteFollowUp(message, conversationHistory) {
 }
 
 export function routeExplicitDesktopCommand(message, conversationHistory = [], desktopControlEnabled = false) {
-  const text = String(message || "").trim();
-  if (!text || text.length > 1200 || isClearlyInstructionalRequest(text)) return null;
-  if (/\b(?:do not|don't|dont|never)\s+(?:open|launch|start|search|browse|google)\b/i.test(text)) return null;
+  const rawText = String(message || "").trim();
+  if (!rawText || rawText.length > 1200 || isClearlyInstructionalRequest(rawText)) return null;
+  if (/\b(?:do not|don't|dont|never)\s+(?:open|launch|start|search|browse|google|play)\b/i.test(rawText)) return null;
+
+  // Strip conversational preambles (e.g. "hey can you", "could you please", "luna please", "can you")
+  // so natural requests match explicit desktop and platform playback routes directly.
+  const text = rawText
+    .replace(/^(?:hey\s+(?:luna\s+)?|hi\s+(?:luna\s+)?|hello\s+(?:luna\s+)?|luna[,\s]+)?(?:can\s+you\s+(?:please\s+)?|could\s+you\s+(?:please\s+)?|please\s+|i\s+want\s+you\s+to\s+|i\s+want\s+to\s+|would\s+you\s+(?:please\s+)?)/i, "")
+    .trim();
+  if (!text) return null;
 
   const pendingWrite = routePendingGeneratedWriteFollowUp(text, conversationHistory);
   if (pendingWrite) return pendingWrite;

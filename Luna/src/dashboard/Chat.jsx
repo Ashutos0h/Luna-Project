@@ -308,10 +308,11 @@ ${document.content}
           : action
       ));
       const actionResults = await executeIntentActions(executableActions, (action) => {
+        const isShell = /^(?:powershell|cmd|terminal|command prompt|bash)$/i.test(String(action.application || ""));
         const labels = {
-          open_app: `Opening ${action.application}…`,
-          open_app_and_type: `Preparing to type in ${action.application}…`,
-          generate_and_type: `Writing in ${action.application}…`,
+          open_app: isShell ? "Processing in background…" : `Opening ${action.application}…`,
+          open_app_and_type: isShell ? "Processing command in background…" : `Preparing to type in ${action.application}…`,
+          generate_and_type: isShell ? "Processing command in background…" : `Writing in ${action.application}…`,
           open_app_and_search: `Opening ${action.application} search…`,
           search_in_application: `Searching ${action.application}…`,
           search_web: "Opening web search…",

@@ -167,3 +167,30 @@ test("formatSearchResultsForContext includes detailed factual reference content"
   assert.match(formatted, /2\. Narendra Modi/);
 });
 
+test("executeAgenticToolCall routes shell commands to executeBackgroundShellCommand", async () => {
+  let executedShell = null;
+  let executedCmd = null;
+  const fakeContext = {
+    executeBackgroundShellCommand: async (shellType, cmd) => {
+      executedShell = shellType;
+      executedCmd = cmd;
+      return { success: true, message: "Command executed in background." };
+    },
+  };
+
+  const res = await executeAgenticToolCall(
+    {
+      function: {
+        name: "open_application",
+        arguments: JSON.stringify({ application: "powershell", text: "Get-Date" }),
+      },
+    },
+    fakeContext
+  );
+
+  assert.equal(res.success, true);
+  assert.equal(executedShell, "powershell");
+  assert.equal(executedCmd, "Get-Date");
+  assert.match(res.message, /background/);
+});
+
