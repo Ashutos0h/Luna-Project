@@ -13,6 +13,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import http from "http";
+import net from "net";
 import { Buffer } from "buffer";
 import { fileURLToPath } from "url";
 import axios from "axios";
@@ -60,9 +61,31 @@ const __filename =
 const __dirname =
   path.dirname(__filename);
 
-const OLLAMA_API_URL = "http://localhost:11434/api/tags";
-const OLLAMA_PULL_URL = "http://localhost:11434/api/pull";
-const OLLAMA_GENERATE_URL = "http://localhost:11434/api/generate";
+let activeOllamaPort = 11434;
+
+function getOllamaHost() {
+  return `127.0.0.1:${activeOllamaPort}`;
+}
+
+function getOllamaBaseUrl() {
+  return `http://${getOllamaHost()}`;
+}
+
+function getOllamaApiUrl() {
+  return `${getOllamaBaseUrl()}/api/tags`;
+}
+
+function getOllamaPullUrl() {
+  return `${getOllamaBaseUrl()}/api/pull`;
+}
+
+function getOllamaGenerateUrl() {
+  return `${getOllamaBaseUrl()}/api/generate`;
+}
+
+function getOllamaChatUrl() {
+  return `${getOllamaBaseUrl()}/api/chat`;
+}
 const MODEL_DOWNLOAD_MAX_ATTEMPTS = 3;
 const MODEL_DOWNLOAD_STALL_MS = 45000;
 let ollamaStartPromise = null;
@@ -331,13 +354,50 @@ function findOllamaExecutable() {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
 
-async function isOllamaRunning() {
+function isPortAvailable(port, host = "127.0.0.1") {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, host);
+  });
+}
+
+async function isOllamaResponding(port = activeOllamaPort) {
   try {
-    await axios.get(OLLAMA_API_URL, { timeout: 1500 });
-    return true;
+    const res = await axios.get(`http://127.0.0.1:${port}/api/tags`, { timeout: 1500 });
+    return res.status === 200;
   } catch {
     return false;
   }
+}
+
+async function isOllamaRunning() {
+  if (await isOllamaResponding(activeOllamaPort)) return true;
+
+  const candidatePorts = [11434, 11500, 11470, 11430, 11501];
+  for (const port of candidatePorts) {
+    if (port === activeOllamaPort) continue;
+    if (await isOllamaResponding(port)) {
+      activeOllamaPort = port;
+      log.info(`Detected running Ollama instance on port ${port}`);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function selectAvailableOllamaPort() {
+  const candidatePorts = [11434, 11500, 11470, 11430, 11501];
+  for (const port of candidatePorts) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+  return activeOllamaPort;
 }
 
 async function ensureOllamaRunning() {
@@ -354,9 +414,15 @@ async function ensureOllamaRunning() {
     ensureOllamaRunnersSilent();
     const executable = findOllamaExecutable() || "ollama";
 
+    // Select a port that is NOT blocked by Windows TCP Port Exclusion Ranges
+    const targetPort = await selectAvailableOllamaPort();
+    activeOllamaPort = targetPort;
+    const targetHost = `127.0.0.1:${targetPort}`;
+    log.info(`Starting Ollama on ${targetHost}`);
+
     try {
-      // Launch Ollama directly. Avoiding an intermediate PowerShell process
-      // makes recovery work on machines with restrictive script policies.
+      // Launch Ollama directly. Passing OLLAMA_HOST ensures it binds to an available port
+      // even when Windows NAT / Hyper-V has reserved port 11434.
       await new Promise((resolve, reject) => {
         const child = spawn(executable, ["serve"], {
           detached: true,
@@ -364,6 +430,7 @@ async function ensureOllamaRunning() {
           stdio: "ignore",
           env: {
             ...process.env,
+            OLLAMA_HOST: targetHost,
             OLLAMA_KEEP_ALIVE: "24h",
             OLLAMA_IGPU_ENABLE: "1",
           },
@@ -381,7 +448,10 @@ async function ensureOllamaRunning() {
 
     for (let attempt = 0; attempt < 12; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      if (await isOllamaRunning()) return true;
+      if (await isOllamaResponding(targetPort)) {
+        activeOllamaPort = targetPort;
+        return true;
+      }
     }
 
     return false;
@@ -407,7 +477,7 @@ async function ensureOllamaModel(modelName) {
   }
 
   try {
-    const tagsResponse = await axios.get(OLLAMA_API_URL, { timeout: 3000 });
+    const tagsResponse = await axios.get(getOllamaApiUrl(), { timeout: 3000 });
     const installedModels = (tagsResponse.data?.models || []).map((model) => model.name);
 
     if (installedModels.some((installedModel) => modelNamesMatch(installedModel, safeModelName))) return true;
@@ -443,7 +513,7 @@ async function preloadOllamaModel(modelName) {
     try {
       const warmupOptions = getOllamaGenerationOptions(model, { performanceMode: "fast" });
       await axios.post(
-        OLLAMA_GENERATE_URL,
+        getOllamaGenerateUrl(),
         {
           model,
           stream: false,
@@ -531,7 +601,7 @@ function startModelDownload(modelName, sender) {
         return false;
       }
 
-      const tagsResponse = await axios.get(OLLAMA_API_URL, { timeout: 3000 });
+      const tagsResponse = await axios.get(getOllamaApiUrl(), { timeout: 3000 });
       const installedModels = (tagsResponse.data?.models || []).map((item) => item.name);
       if (installedModels.some((installedModel) => modelNamesMatch(installedModel, model))) {
         sendModelProgress(job, { model, state: "complete", status: `${model} is ready to use.`, percent: 100 });
@@ -563,7 +633,7 @@ function startModelDownload(modelName, sender) {
 
         try {
           const response = await axios.post(
-            OLLAMA_PULL_URL,
+            getOllamaPullUrl(),
             { name: model, stream: true },
             {
               responseType: "stream",
@@ -668,7 +738,7 @@ function startModelDownload(modelName, sender) {
             });
           });
 
-          const verification = await axios.get(OLLAMA_API_URL, { timeout: 5000 });
+          const verification = await axios.get(getOllamaApiUrl(), { timeout: 5000 });
           const verified = (verification.data?.models || [])
             .some((installedModel) => modelNamesMatch(installedModel.name, model));
 
@@ -1099,7 +1169,7 @@ async function classifyIntentWithRouter({
 
   try {
     const response = await axios.post(
-      "http://localhost:11434/api/chat",
+      getOllamaChatUrl(),
       {
         model: INTENT_ROUTER_MODEL,
         messages: [
@@ -2612,7 +2682,7 @@ ${message}
 
       try {
         initialResponse = await axios.post(
-          "http://localhost:11434/api/chat",
+          getOllamaChatUrl(),
           requestBody,
           requestConfig
         );
@@ -2642,7 +2712,7 @@ ${message}
             : chatMessage
         ));
         initialResponse = await axios.post(
-          "http://localhost:11434/api/chat",
+          getOllamaChatUrl(),
           fallbackRequestBody,
           { ...requestConfig, responseType: "stream" }
         );
@@ -2800,7 +2870,7 @@ ${message}
         }
 
         const continuationResponse = await axios.post(
-          "http://localhost:11434/api/chat",
+          getOllamaChatUrl(),
           {
             model: aiModel,
             messages: continuationMessages,
@@ -2956,7 +3026,7 @@ ${conversationSnippet}
 Topic Title:`;
 
     const response = await axios.post(
-      "http://localhost:11434/api/generate",
+      getOllamaGenerateUrl(),
       {
         model: safeModel,
         prompt,
@@ -3007,7 +3077,7 @@ ipcMain.handle("check-ollama-status", async () => {
     };
   }
 
-  const response = await axios.get(OLLAMA_API_URL, { timeout: 3000 });
+  const response = await axios.get(getOllamaApiUrl(), { timeout: 3000 });
   return {
     installed: true,
     running: true,
@@ -3043,7 +3113,7 @@ ipcMain.handle("get-ollama-model-info", async (event, modelName) => {
   let installed = false;
 
   try {
-    const response = await axios.get(OLLAMA_API_URL, { timeout: 1500 });
+    const response = await axios.get(getOllamaApiUrl(), { timeout: 1500 });
     installed = (response.data?.models || []).some((item) => modelNamesMatch(item.name, model));
   } catch { /* Ollama may still be starting; the download request will handle it. */ }
 
